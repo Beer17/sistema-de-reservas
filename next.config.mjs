@@ -1,16 +1,12 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+  // Deja clara la raíz del proyecto (evita lockfiles de directorios superiores).
+  outputFileTracingRoot: path.dirname(fileURLToPath(import.meta.url)),
   cacheComponents: true,
   partialPrefetching: true,
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
-  },
 };
 
 export default nextConfig;

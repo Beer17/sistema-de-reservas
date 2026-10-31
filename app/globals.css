@@ -29,7 +29,7 @@
   --color-warning-400: #fbbf24;
   --color-warning-500: #f59e0b;
 
-  --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-inter), 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 /* ===== Base Styles ===== */
@@ -38,10 +38,28 @@
   scrollbar-color: rgba(99, 102, 241, 0.3) transparent;
 }
 
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
 body {
   background: linear-gradient(135deg, #020617 0%, #0f172a 40%, #1e1b4b 100%);
+  background-attachment: fixed;
   color: #e2e8f0;
   font-family: var(--font-sans);
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+button,
+[role='button'] {
+  touch-action: manipulation;
+}
+
+:where(a, button, input, select, textarea, [role='button']):focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
 }
 
 /* ===== Custom Animations ===== */
@@ -166,10 +184,11 @@ body {
 
 /* ===== Glassmorphism ===== */
 .glass {
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(99, 102, 241, 0.15);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
 }
 
 .glass-light {
@@ -209,6 +228,7 @@ body {
   font-weight: 600;
   padding: 0.625rem 1.5rem;
   border-radius: 0.75rem;
+  min-height: 2.75rem;
   transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
   border: none;
@@ -219,6 +239,12 @@ body {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(99, 102, 241, 0.45);
   background: linear-gradient(135deg, #818cf8, #6366f1);
+}
+
+/* Subtle focus animation for inputs */
+.input-field:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
 }
 
 .btn-primary:active {
@@ -238,6 +264,7 @@ body {
   font-weight: 600;
   padding: 0.5rem 1.25rem;
   border-radius: 0.75rem;
+  min-height: 2.75rem;
   transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   box-shadow: 0 4px 15px rgba(239, 68, 68, 0.25);
   border: none;
@@ -255,6 +282,7 @@ body {
   font-weight: 500;
   padding: 0.5rem 1.25rem;
   border-radius: 0.75rem;
+  min-height: 2.75rem;
   transition: all 0.2s ease;
   border: 1px solid rgba(148, 163, 184, 0.2);
   cursor: pointer;
@@ -273,7 +301,7 @@ body {
   border-radius: 0.75rem;
   padding: 0.75rem 1rem;
   color: #e2e8f0;
-  font-size: 0.95rem;
+  font-size: 1rem; /* evita el zoom automático en iOS */
   transition: all 0.3s ease;
   width: 100%;
   outline: none;
@@ -308,6 +336,17 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.2);
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+/* Un admin puede pulsar las reservas ajenas para liberarlas. */
+.slot-booked-admin {
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.slot-booked-admin:hover {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.45);
 }
 
 .slot-mine {
@@ -380,4 +419,40 @@ body {
   filter: blur(100px);
   pointer-events: none;
   z-index: 0;
+}
+
+/* ===== Mobile helpers ===== */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* ===== Accesibilidad: respetar preferencias de movimiento ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ===== Ajustes de rendimiento en pantallas pequeñas ===== */
+@media (max-width: 640px) {
+  .glass,
+  .glass-light,
+  .glass-card {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
 }

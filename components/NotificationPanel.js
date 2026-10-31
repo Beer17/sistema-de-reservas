@@ -1,81 +1,140 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import useStore from '@/lib/store';
+
+const SLOT_NOTICE_TYPES = new Set(['slot_freed', 'reservation_cancelled']);
 
 export default function NotificationPanel() {
   const [isOpen, setIsOpen] = useState(false);
-  const panelRef = useRef(null);
-
-  const currentUser = useStore((s) => s.currentUser);
-  const getUserNotifications = useStore((s) => s.getUserNotifications);
-  const getUnreadCount = useStore((s) => s.getUnreadCount);
-  const markAsRead = useStore((s) => s.markAsRead);
-  const markAllAsRead = useStore((s) => s.markAllAsRead);
-  const bookSlot = useStore((s) => s.bookSlot);
-
-  const notifications = getUserNotifications();
-  const unreadCount = getUnreadCount();
-
   const [bellAnimating, setBellAnimating] = useState(false);
-  const prevUnreadRef = useRef(unreadCount);
+  const [now, setNow] = useState(0);
+  const panelRef = useRef(null);
+  const prevUnreadRef = useRef(0);
 
-  // Animar campana cuando llega nueva notificación
+  // Refresca los tiempos relativos mientras el panel está abierto.
+  useEffect(() => {
+    if (!isOpen) return;
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(interval);
+  }, [isOpen]);
+
+  const currentUser = useStore((state) => state.currentUser);
+  const notifications = useStore((state) => state.notifications);
+  const timeSlots = useStore((state) => state.timeSlots);
+  const markAsRead = useStore((state) => state.markAsRead);
+  const markAllAsRead = useStore((state) => state.markAllAsRead);
+  const bookSlot = useStore((state) => state.bookSlot);
+  const addToast = useStore((state) => state.addToast);
+
+  // Solo las notificaciones dirigidas al alumno actual
+  const myNotifications = useMemo(() => {
+    if (!currentUser) return [];
+    return notifications.filter((notification) =>
+      notification.target_user_ids.includes(currentUser.id)
+    );
+  }, [notifications, currentUser]);
+
+  const unreadCount = useMemo(() => {
+    if (!currentUser) return 0;
+    return myNotifications.filter(
+      (notification) => !notification.read_by.includes(currentUser.id)
+    ).length;
+  }, [myNotifications, currentUser]);
+
+  // Animar la campana cuando llega una notificación nueva
   useEffect(() => {
     if (unreadCount > prevUnreadRef.current) {
       setBellAnimating(true);
       const timer = setTimeout(() => setBellAnimating(false), 1000);
+      prevUnreadRef.current = unreadCount;
       return () => clearTimeout(timer);
     }
     prevUnreadRef.current = unreadCount;
   }, [unreadCount]);
 
-  // Cerrar panel al hacer click fuera
+  // Cerrar al hacer clic fuera o pulsar Escape
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (panelRef.current && !panelRef.current.contains(e.target)) {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event) => {
+      if (panelRef.current && !panelRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
 
-  const handleQuickBook = (slotId) => {
-    const result = bookSlot(slotId);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside, { passive: true });
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  const handleQuickBook = (notification) => {
+    const result = bookSlot(notification.slot_id);
     if (result.success) {
+      markAsRead(notification.id);
       setIsOpen(false);
+    } else {
+      addToast({
+        type: 'error',
+        title: 'Horario no disponible',
+        message: result.error || 'Ese horario ya fue ocupado por otro compañero.',
+      });
     }
   };
 
-  const timeAgo = (dateStr) => {
-    const now = new Date();
-    const past = new Date(dateStr);
-    const diffMs = now - past;
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
+  const timeAgo = (dateString) => {
+    if (!now) return '';
+    const timestamp = new Date(dateString).getTime();
+    if (Number.isNaN(timestamp)) return '';
 
-    if (diffSec < 60) return 'Ahora mismo';
-    if (diffMin < 60) return `Hace ${diffMin} min`;
-    if (diffHour < 24) return `Hace ${diffHour}h`;
-    return `Hace ${Math.floor(diffHour / 24)}d`;
+    const diffSeconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+    if (diffSeconds < 60) return 'Ahora mismo';
+
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) return `Hace ${diffMinutes} min`;
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `Hace ${diffHours} h`;
+
+    return `Hace ${Math.floor(diffHours / 24)} d`;
   };
 
   return (
     <div className="relative" ref={panelRef}>
-      {/* Botón de campana */}
+      {/* Campana */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-xl hover:bg-surface-700/50 transition-all duration-200 group"
-        aria-label="Notificaciones"
+        type="button"
+        onClick={() => {
+          setIsOpen((open) => !open);
+          setNow(Date.now());
+        }}
+        className="relative p-2 rounded-xl hover:bg-surface-700/50 transition-colors group"
+        aria-label={
+          unreadCount > 0
+            ? `Notificaciones, ${unreadCount} sin leer`
+            : 'Notificaciones'
+        }
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
       >
         <svg
-          className={`w-6 h-6 text-surface-200/60 group-hover:text-white transition-colors ${bellAnimating ? 'animate-bell-ring' : ''}`}
+          className={`w-[1.35rem] h-[1.35rem] sm:w-6 sm:h-6 text-surface-200/60 group-hover:text-white transition-colors ${
+            bellAnimating ? 'animate-bell-ring' : ''
+          }`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
           strokeWidth={1.5}
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -85,117 +144,122 @@ export default function NotificationPanel() {
         </svg>
 
         {unreadCount > 0 && (
-          <span className="notification-badge animate-scale-in">
+          <span className="notification-badge animate-scale-in" aria-hidden="true">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
-      {/* Panel desplegable */}
+      {/* Panel */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-96 max-h-[480px] glass-card rounded-2xl overflow-hidden animate-fade-in-down z-50 shadow-2xl shadow-black/40">
-          {/* Header del panel */}
-          <div className="p-4 border-b border-surface-200/10 flex items-center justify-between">
+        <div
+          role="dialog"
+          aria-label="Notificaciones"
+          className="fixed left-3 right-3 top-[4.25rem] sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 glass-card rounded-2xl overflow-hidden animate-fade-in-down z-50 shadow-2xl shadow-black/40 flex flex-col max-h-[70dvh] sm:max-h-[480px]"
+        >
+          {/* Cabecera */}
+          <div className="p-4 border-b border-surface-200/10 flex items-center justify-between gap-3 shrink-0">
             <div>
               <h3 className="font-bold text-white text-sm">Notificaciones</h3>
-              {unreadCount > 0 && (
-                <p className="text-xs text-primary-400 mt-0.5">
-                  {unreadCount} sin leer
-                </p>
-              )}
+              <p className="text-xs text-primary-400 mt-0.5">
+                {unreadCount > 0 ? `${unreadCount} sin leer` : 'Todo al día'}
+              </p>
             </div>
             {unreadCount > 0 && (
               <button
+                type="button"
                 onClick={markAllAsRead}
-                className="text-xs text-primary-400 hover:text-primary-300 transition-colors font-medium"
+                className="text-xs text-primary-400 hover:text-primary-300 transition-colors font-medium shrink-0"
               >
-                Marcar todas como leídas
+                Marcar todas
               </button>
             )}
           </div>
 
-          {/* Lista de notificaciones */}
-          <div className="overflow-y-auto max-h-[380px]">
-            {notifications.length === 0 ? (
+          {/* Lista */}
+          <div className="overflow-y-auto flex-1 min-h-0">
+            {myNotifications.length === 0 ? (
               <div className="p-8 text-center">
                 <div className="w-12 h-12 rounded-full bg-surface-700/50 flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-6 h-6 text-surface-200/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <svg className="w-6 h-6 text-surface-200/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                   </svg>
                 </div>
                 <p className="text-surface-200/40 text-sm">No tienes notificaciones</p>
                 <p className="text-surface-200/25 text-xs mt-1">
-                  Te notificaremos cuando se liberen horarios
+                  Te avisaremos cuando se liberen horarios
                 </p>
               </div>
             ) : (
-              notifications.map((notif, i) => {
-                const isRead = notif.read_by.includes(currentUser?.id);
-                const timeSlots = useStore.getState().timeSlots;
-                const relatedSlot = timeSlots.find((s) => s.id === notif.slot_id);
-                const canBook = relatedSlot?.is_available && !currentUser?.has_booked_slot;
+              myNotifications.map((notification) => {
+                const isRead = notification.read_by.includes(currentUser?.id);
+                const relatedSlot = timeSlots.find(
+                  (slot) => slot.id === notification.slot_id
+                );
+                const canBook = Boolean(relatedSlot?.is_available);
 
                 return (
                   <div
-                    key={notif.id}
-                    className={`
-                      p-4 border-b border-surface-200/5 transition-all duration-200
-                      hover:bg-surface-700/30
-                      ${!isRead ? 'bg-primary-500/5' : ''}
-                    `}
-                    onClick={() => !isRead && markAsRead(notif.id)}
+                    key={notification.id}
+                    className={`p-4 border-b border-surface-200/5 transition-colors hover:bg-surface-700/30 ${
+                      !isRead ? 'bg-primary-500/5' : ''
+                    }`}
                   >
                     <div className="flex gap-3">
-                      {/* Icono */}
-                      <div className={`
-                        w-10 h-10 rounded-xl flex items-center justify-center shrink-0
-                        ${notif.type === 'slot_freed'
-                          ? 'bg-accent-500/15'
-                          : 'bg-primary-500/15'
-                        }
-                      `}>
-                        {notif.type === 'slot_freed' ? (
-                          <svg className="w-5 h-5 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                          SLOT_NOTICE_TYPES.has(notification.type)
+                            ? 'bg-accent-500/15'
+                            : 'bg-primary-500/15'
+                        }`}
+                      >
+                        {SLOT_NOTICE_TYPES.has(notification.type) ? (
+                          <svg className="w-5 h-5 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         ) : (
-                          <svg className="w-5 h-5 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <svg className="w-5 h-5 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         )}
                       </div>
 
-                      {/* Contenido */}
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm leading-relaxed ${!isRead ? 'text-white font-medium' : 'text-surface-200/70'}`}>
-                          {notif.message}
-                        </p>
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="text-xs text-surface-200/30">
-                            {timeAgo(notif.created_at)}
+                        <button
+                          type="button"
+                          onClick={() => !isRead && markAsRead(notification.id)}
+                          className="block w-full text-left"
+                        >
+                          <p className={`text-sm leading-tight ${!isRead ? 'text-white font-semibold' : 'text-surface-200/80 font-medium'}`}>
+                            {notification.title || 'Notificación'}
+                          </p>
+                          <p className={`text-xs leading-relaxed mt-1 ${!isRead ? 'text-surface-200/70' : 'text-surface-200/45'}`}>
+                            {notification.message}
+                          </p>
+                        </button>
+
+                        <div className="flex items-center justify-between gap-2 mt-2.5">
+                          <span className="text-[0.7rem] text-surface-200/30">
+                            {timeAgo(notification.created_at)}
                           </span>
 
-                          {/* Botón rápido de reservar */}
-                          {canBook && notif.type === 'slot_freed' && (
+                          {canBook && SLOT_NOTICE_TYPES.has(notification.type) && (
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleQuickBook(notif.slot_id);
-                              }}
-                              className="text-xs font-semibold text-accent-400 hover:text-accent-300 transition-colors flex items-center gap-1 bg-accent-500/10 px-2.5 py-1 rounded-lg hover:bg-accent-500/20"
+                              type="button"
+                              onClick={() => handleQuickBook(notification)}
+                              className="text-xs font-semibold text-accent-400 hover:text-accent-300 transition-colors flex items-center gap-1 bg-accent-500/10 px-2.5 py-1.5 rounded-lg hover:bg-accent-500/20"
                             >
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                               </svg>
-                              Reservar ahora
+                              Reservar
                             </button>
                           )}
                         </div>
                       </div>
 
-                      {/* Indicador de no leída */}
                       {!isRead && (
-                        <div className="w-2 h-2 rounded-full bg-primary-400 shrink-0 mt-2" />
+                        <span className="w-2 h-2 rounded-full bg-primary-400 shrink-0 mt-2" aria-label="No leída" />
                       )}
                     </div>
                   </div>
