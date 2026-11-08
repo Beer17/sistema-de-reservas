@@ -1,66 +1,89 @@
-# Agenda de Entregas
+# Sistema de Reservas
 
-Prototipo funcional de una agenda para que los estudiantes reserven un bloque de 30 minutos y presenten sus entregas durante una semana de clases.
+Sistema de reservas de horarios con sincronización compartida entre dispositivos. Los usuarios reservan bloques de 30 minutos, reprograman o cancelan, y reciben notificaciones cuando se libera un espacio.
 
-Funciona **sin base de datos ni backend**: todo el estado (sesión, reservas y notificaciones) vive en el navegador con `localStorage`, así que puede desplegarse en Vercel como una app estática de Next.js sin configurar nada adicional.
+**Sincronización:** con Supabase configurado, una reserva hecha en un móvil se ve al instante en otro perfil (por ejemplo: Juanito reserva desde su celular y Abel lo ve en el suyo). Sin configuración, el sistema funciona en modo local (solo en ese navegador) para demos rápidas.
 
 ---
 
 ## Demo
 
-La app abre en la pantalla de inicio de sesión. Todas las cuentas usan la misma contraseña.
+La app abre en el inicio de sesión. Todas las cuentas usan la misma contraseña.
 
-| Usuario       | Correo                   | Contraseña | Rol           |
-| ------------- | ------------------------ | ---------- | ------------- |
-| Abel García   | `abel@universidad.edu`   | `1234`     | Administrador |
-| María López   | `maria@universidad.edu`  | `1234`     | Alumno        |
-| Carlos Ruiz   | `carlos@universidad.edu` | `1234`     | Alumno        |
-| Ana Torres    | `ana@universidad.edu`    | `1234`     | Alumno        |
-| Luis Mendoza  | `luis@universidad.edu`   | `1234`     | Alumno        |
+| Usuario       | Correo                 | Contraseña | Rol           |
+| ------------- | ---------------------- | ---------- | ------------- |
+| Abel García   | `abel@empresa.com`     | `1234`     | Administrador |
+| María López   | `maria@empresa.com`    | `1234`     | Usuario       |
+| Carlos Ruiz   | `carlos@empresa.com`   | `1234`     | Usuario       |
+| Ana Torres    | `ana@empresa.com`      | `1234`     | Usuario       |
+| Luis Mendoza  | `luis@empresa.com`     | `1234`     | Usuario       |
 
 En el login puedes tocar cualquier cuenta para autocompletar el formulario.
 
 ### Roles
 
-- **Administrador (Abel):** puede liberar el horario reservado por cualquier alumno y es el único que puede usar **Reiniciar demo**.
-- **Alumno (resto):** solo puede reservar, reprogramar y cancelar su propia reserva.
+- **Administrador (Abel):** puede liberar la reserva de cualquier usuario y es el único que puede usar **Reiniciar demo**.
+- **Usuario (resto):** solo puede reservar, reprogramar y cancelar su propia reserva.
 
 El rol se define en `DEMO_USERS` (`lib/data.js`) y se normaliza al iniciar sesión, así que una sesión vieja guardada en el navegador no puede cambiar los permisos.
 
-### Probar las notificaciones con un solo navegador
+### Probar la sincronización entre dispositivos
 
-1. Entra como **Abel** y reserva un horario.
-2. Abre el menú del avatar (arriba a la derecha) y cambia a **María**.
-3. Pulsa la campana: María no recibe nada todavía.
-4. Vuelve a **Abel**, cancela su reserva.
-5. Cambia de nuevo a **María** y abre la campana: verás el aviso de *Horario liberado* con el botón **Reservar**.
+1. Configura Supabase (ver sección siguiente) y despliega en Vercel con las variables de entorno.
+2. Abre la URL en dos dispositivos o navegadores.
+3. Entra como **María** en uno y reserva un horario.
+4. Entra como **Abel** en el otro: verás la reserva de María sin recargar (Realtime) o como máximo en 3 segundos (polling de respaldo).
+5. Cancela o libera esa reserva: el otro dispositivo se actualiza y la campana de notificaciones avisa a los usuarios sin reserva.
 
-El menú del avatar también permite cambiar de usuario y **Cerrar sesión**. La opción **Reiniciar demo** (borra reservas y notificaciones) solo aparece para el administrador.
+El menú del avatar también permite cambiar de usuario y **Cerrar sesión**. La opción **Reiniciar demo** (borra reservas y notificaciones) solo aparece para el administrador y también se sincroniza.
 
-### Probar la liberación de un horario como administrador
+---
 
-1. Entra como **María** y reserva un horario.
-2. Cambia a **Abel** con el menú del avatar.
-3. En el panel **Horarios seleccionados** verás la reserva de María con su nombre, día y hora. Pulsa **Liberar** (también puedes hacerlo desde la tarjeta del horario en la agenda).
-4. Confirma **Sí, liberar**.
-5. Vuelve a **María** y abre la campana: recibirá el aviso *Reserva liberada por administración* con la opción de volver a reservarlo.
+## Sincronización compartida (Supabase)
+
+### Por qué hace falta una base de datos
+
+Next.js en Vercel es *stateless*: no guarda información entre despliegues. Si el sistema viviera solo en `localStorage`, cada celular vería sus propias reservas. Para que **todos vean lo mismo** se necesita una base de datos compartida en la nube.
+
+Este proyecto usa **Supabase** (Postgres + Realtime) con una tabla de un solo documento (`app_state`) para mantener simple la lógica actual. Plan gratuito suficiente para demos.
+
+### Configuración en 3 pasos (una sola vez)
+
+1. **Crea un proyecto gratuito** en <https://supabase.com> → anota tu `URL` y `anon key` (Project Settings → API).
+2. **Crea la tabla:** en Supabase abre **SQL Editor**, pega todo el contenido de `supabase/schema.sql` y pulsa **Run**. Esto crea `public.app_state` y habilita Realtime.
+3. **Configura Vercel:** en Vercel → tu proyecto → **Settings → Environment Variables**, crea:
+   - `NEXT_PUBLIC_SUPABASE_URL` = tu URL de Supabase
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = tu anon key
+   Luego vuelve a desplegar (**Deployments → Redeploy** o un nuevo push).
+
+Para desarrollo local, copia `.env.example` como `.env.local` y rellena los mismos valores.
+
+> **Si no configuras Supabase**, la app sigue funcionando en **modo local**: la cabecera muestra un aviso “Modo local” y cada navegador tendrá su propio estado. Es útil para probar la interfaz sin salir a producción.
+
+### Cómo funciona el sincronizado
+
+- **Fuente de verdad:** la fila `id=1` de `public.app_state` con `payload = { users, timeSlots, notifications, updatedAt, clientId }`.
+- **Subida:** cada reserva/cancelación/notificación dispara una subida (debounce 400 ms) con `upsert`.
+- **Bajada:** al iniciar se trae el estado remoto; luego se escucha por **Realtime** (`postgres_changes`) y con **polling cada 3 segundos** como respaldo.
+- **La sesión** (quién soy yo) sigue siendo local por navegador. Lo que se comparte son las reservas, usuarios y notificaciones.
 
 ---
 
 ## Funcionalidades
 
 - Inicio de sesión con cuentas de demostración y sesión persistente.
-- Semana de entregas de lunes a viernes con 10 bloques de 30 minutos por día (50 horarios).
+- Periodo de reservas de lunes a viernes con 10 bloques de 30 minutos por día (50 horarios).
 - Selector de día con contador de horarios libres por jornada.
 - Reserva con modal de confirmación y validación de horarios ya ocupados.
 - Reprogramación: al reservar otro horario se libera automáticamente el anterior.
 - Cancelación de reserva con confirmación.
-- Notificaciones para los alumnos sin horario cuando se libera un bloque.
+- Notificaciones para usuarios sin reserva cuando se libera un bloque.
 - Reserva rápida directamente desde la notificación.
 - Contador de no leídas, marcar una o todas como leídas.
-- Panel de administrador: Abel ve el resumen **Horarios seleccionados** con todas las reservas de la semana (alumno, día y hora), puede liberar cualquiera y se notifica al afectado.
-- Reinicio de la demo restringido al administrador.
+- Panel de administrador: Abel ve el resumen **Horarios seleccionados** con todas las reservas del periodo (usuario, día y hora), puede liberar cualquiera y se notifica al afectado.
+- Reinicio de la demo restringido al administrador (también sincronizado).
 - Cambio rápido de usuario para probar la demo completa.
+- Indicador de estado de sincronización: *Modo local / Sincronizando… / Sincronizado / Error*.
 - Toasts de éxito y error.
 - Diseño responsive: 2 columnas de horarios en móvil, 3 en tablet, 4–5 en laptop/escritorio.
 - Modales tipo *bottom sheet* en móvil y centrados en escritorio.
@@ -73,7 +96,8 @@ El menú del avatar también permite cambiar de usuario y **Cerrar sesión**. La
 
 - [Next.js 16](https://nextjs.org) (App Router, build con Turbopack)
 - [React 19](https://react.dev)
-- [Zustand 5](https://zustand.docs.pmnd.rs) con middleware `persist`
+- [Zustand 5](https://zustand.docs.pmnd.rs) con middleware `persist` (caché local)
+- [Supabase](https://supabase.com) (Postgres + Realtime) para sincronización compartida
 - [Tailwind CSS 4](https://tailwindcss.com) vía `@tailwindcss/postcss`
 - `next/font` (Inter)
 - ESLint 9 + `eslint-config-next`
@@ -82,8 +106,9 @@ El menú del avatar también permite cambiar de usuario y **Cerrar sesión**. La
 
 ## Requisitos
 
-- Node.js 20 o superior (probado con Node 26)
+- Node.js 20 o superior
 - npm 10 o superior
+- (Opcional pero recomendado) cuenta gratuita de Supabase para sincronización
 
 ---
 
@@ -95,6 +120,8 @@ npm run dev
 ```
 
 Abre <http://localhost:3000>.
+
+Para probar la sincronización en local, copia `.env.example` a `.env.local` y completa tu URL y anon key de Supabase.
 
 ### Scripts
 
@@ -116,18 +143,17 @@ npm start
 
 ## Despliegue en Vercel
 
-No hace falta configurar variables de entorno, base de datos ni servicios externos.
-
 ### Opción A: desde el panel de Vercel
 
 1. Sube el proyecto a GitHub/GitLab/Bitbucket.
 2. En Vercel, pulsa **Add New → Project** e importa el repositorio.
-3. Vercel detecta Next.js automáticamente. Deja los valores por defecto:
+3. Vercel detecta Next.js automáticamente:
    - **Framework Preset:** Next.js
    - **Build Command:** `npm run build`
    - **Output Directory:** `.next` (por defecto)
    - **Install Command:** `npm install`
-4. Pulsa **Deploy**.
+4. Agrega las dos variables de entorno de Supabase (ver arriba) **antes o después** del primer deploy. Si las agregas después, haz **Redeploy**.
+5. Pulsa **Deploy**.
 
 > El repositorio ya tiene la raíz del proyecto en la carpeta actual (donde está `package.json`), así que no necesitas configurar *Root Directory*.
 
@@ -139,6 +165,8 @@ vercel
 vercel --prod
 ```
 
+Después agrega las variables de Supabase en el panel de Vercel y redeploy.
+
 ---
 
 ## Personalización
@@ -147,32 +175,29 @@ Casi todos los datos del prototipo están en `lib/data.js`:
 
 | Qué cambiar                | Dónde                                                      |
 | -------------------------- | ---------------------------------------------------------- |
-| Semana de entregas         | `WEEK_START_ISO` (lunes en formato `YYYY-MM-DD`)            |
+| Periodo de reservas        | `WEEK_START_ISO` (lunes en formato `YYYY-MM-DD`)            |
 | Cantidad de días hábiles   | `WEEK_DAYS`                                                 |
 | Bloques de horario         | `TIME_BLOCKS`                                               |
-| Alumnos de demostración    | `DEMO_USERS`                                                |
+| Usuarios de demostración   | `DEMO_USERS`                                                |
 | Roles (admin / user)       | `role` de cada usuario en `DEMO_USERS`                      |
 | Contraseña de la demo      | `DEMO_PASSWORD` (también en cada usuario)                   |
 
-La lógica de reservas, cancelaciones y notificaciones está en `lib/store.js`.
+La lógica de reservas, cancelaciones y notificaciones está en `lib/store.js`. La conexión a la nube está en `lib/supabase.js`.
 
-> **Importante:** la semana es una fecha fija a propósito. Si se usara la fecha real del servidor y la del navegador podrían no coincidir y romper la hidratación de React. Para actualizar la agenda, cambia `WEEK_START_ISO` y vuelve a desplegar.
+> **Importante:** el periodo usa una fecha fija a propósito. Si se usara la fecha real del servidor y la del navegador podrían no coincidir y romper la hidratación de React. Para actualizar el periodo, cambia `WEEK_START_ISO` y vuelve a desplegar.
 
 ---
 
 ## Cómo se guarda la información
 
-El estado se persiste bajo la clave `agenda-entregas-store` en `localStorage`:
-
-- Reservas y horarios ocupados.
-- Sesión del alumno actual.
-- Notificaciones y cuáles fueron leídas.
+- **Caché local** (por navegador): clave `sistema-reservas:v1` en `localStorage` (sesión, usuarios, horarios, notificaciones).
+- **Nube compartida** (si Supabase está configurado): tabla `public.app_state`, fila `id=1`, con `payload` (mismos datos menos la sesión actual) y `updated_at`.
 
 Consecuencias:
 
-- Los datos son **por navegador y por dispositivo**; no se comparten entre alumnos reales.
-- Al limpiar los datos del sitio o usar una ventana privada, la demo vuelve a su estado inicial.
-- Si cambias la estructura de los datos en `lib/data.js`, usa **Reiniciar demo** en el menú del avatar (o borra el `localStorage`) para evitar estados viejos.
+- Con Supabase configurado, **todos los dispositivos comparten las mismas reservas y notificaciones** (posible pagar con Realtime o polling de 3 s).
+- Sin Supabase, los datos son **por navegador y por dispositivo**; no se comparten. Al limpiar los datos del sitio o usar modo privado, la demo vuelve a su estado inicial.
+- Si cambias la estructura de `lib/data.js`, usa **Reiniciar demo** como administrador (o borra el `localStorage` y la fila remota) para evitar estados viejos.
 
 En el servidor el store no toca `localStorage`; la hidratación se hace en cliente detrás de un pequeño *boot screen* (`components/StoreHydration.js`) para evitar diferencias entre el HTML del servidor y el del navegador.
 
@@ -189,16 +214,20 @@ app/
 │  ├─ not-found.js        # 404
 │  └─ page.js             # Página principal
 ├─ components/
-│  ├─ Dashboard.js        # Layout autenticado
-│  ├─ Header.js           # Barra superior, menú de usuario y cambio de alumno
+│  ├─ Dashboard.js        # Layout autenticado + aviso de modo local
+│  ├─ Header.js           # Barra superior, menú de usuario y estado de sincronización
 │  ├─ LoginForm.js        # Inicio de sesión y cuentas demo
 │  ├─ NotificationPanel.js# Panel de notificaciones
 │  ├─ ScheduleGrid.js     # Días, horarios y modales de reserva/cancelación
-│  ├─ StoreHydration.js   # Espera a la rehidratación de localStorage
+│  ├─ StoreHydration.js   # Espera a la caché local + primera sincronización en la nube
 │  └─ ToastContainer.js   # Avisos flotantes
 ├─ lib/
-│  ├─ data.js             # Usuarios demo, semana y bloques horarios
-│  └─ store.js            # Estado global, reservas y notificaciones
+│  ├─ data.js             # Usuarios demo, periodo y bloques horarios
+│  ├─ store.js            # Estado global, reservas, notificaciones y sync con Supabase
+│  └─ supabase.js         # Cliente de Supabase (solo si hay variables configuradas)
+├─ supabase/
+│  └─ schema.sql          # Script SQL para crear la tabla compartida en Supabase
+├─ .env.example            # Modelo de variables de entorno
 ├─ next.config.mjs
 ├─ postcss.config.mjs
 └─ package.json
@@ -209,5 +238,5 @@ app/
 ## Notas
 
 - Es un prototipo de demostración: las contraseñas están en el código del cliente y no hay autenticación real.
-- No hay persistencia compartida entre usuarios; para una versión real haría falta un backend o un servicio como Supabase/Firebase.
-- El proyecto fue verificado con `npm run lint`, `npm run build` y pruebas end-to-end en Chrome (login, reserva, reprogramación, cancelación, notificaciones, cambio de alumno y layout móvil/escritorio).
+- Las políticas de Supabase de este repo están abiertas para la demo (anon puede leer/escribir `app_state`). Para un sistema real, restringe las políticas y agrega autenticación de Supabase.
+- Al subir un cambio gigante de datos (por ejemplo, reiniciar la demo), el sistema lo propaga a todos los dispositivos en segundos.

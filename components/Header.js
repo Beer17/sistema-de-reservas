@@ -11,8 +11,28 @@ export default function Header() {
   const resetDemo = useStore((state) => state.resetDemo);
   const logout = useStore((state) => state.logout);
   const addToast = useStore((state) => state.addToast);
+  const cloudStatus = useStore((state) => state.cloudStatus);
+  const lastSyncedAt = useStore((state) => state.lastSyncedAt);
 
   const isAdmin = currentUser?.role === 'admin';
+
+  const syncLabel =
+    cloudStatus === 'synced'
+      ? 'Sincronizado'
+      : cloudStatus === 'syncing'
+        ? 'Sincronizando…'
+        : cloudStatus === 'error'
+          ? 'Error de sincronización'
+          : 'Modo local';
+
+  const syncDot =
+    cloudStatus === 'synced'
+      ? 'bg-accent-500'
+      : cloudStatus === 'syncing'
+        ? 'bg-warning-400 animate-pulse'
+        : cloudStatus === 'error'
+          ? 'bg-danger-400'
+          : 'bg-surface-200/30';
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -73,13 +93,24 @@ export default function Header() {
               </svg>
             </div>
             <div className="hidden sm:block min-w-0">
-              <p className="text-sm font-bold gradient-text leading-tight">Agenda de Entregas</p>
-              <p className="text-xs text-surface-200/30 leading-tight">Sistema de programación</p>
+              <p className="text-sm font-bold gradient-text leading-tight">Sistema de Reservas</p>
+              <p className="text-xs text-surface-200/30 leading-tight">Reserva de horarios</p>
             </div>
           </div>
 
           {/* Acciones */}
           <div className="flex items-center gap-0.5 sm:gap-1">
+            <span
+              className="hidden md:inline-flex items-center gap-1.5 mr-1 px-2.5 py-1 rounded-lg bg-surface-800/50 border border-surface-200/10 text-[0.7rem] text-surface-200/50"
+              title={
+                lastSyncedAt
+                  ? `Última sincronización: ${new Date(lastSyncedAt).toLocaleTimeString('es')}`
+                  : 'Estado de sincronización'
+              }
+            >
+              <span className={`w-2 h-2 rounded-full ${syncDot}`} aria-hidden="true" />
+              {syncLabel}
+            </span>
             <NotificationPanel />
 
             <div className="relative" ref={menuRef}>
@@ -99,8 +130,8 @@ export default function Header() {
                     {isAdmin
                       ? 'Administrador'
                       : currentUser.has_booked_slot
-                        ? 'Con horario'
-                        : 'Sin horario'}
+                        ? 'Con reserva'
+                        : 'Sin reserva'}
                   </span>
                 </span>
                 <span className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs sm:text-sm font-bold shadow-md shadow-primary-500/20">
@@ -154,11 +185,11 @@ export default function Header() {
                           currentUser.has_booked_slot ? 'bg-primary-400' : 'bg-surface-200/30'
                         }`}
                       />
-                      {currentUser.has_booked_slot ? 'Reserva activa' : 'Sin horario asignado'}
+                      {currentUser.has_booked_slot ? 'Reserva activa' : 'Sin reserva'}
                     </span>
                   </div>
 
-                  {/* Cambio rápido de alumno */}
+                  {/* Cambio rápido de usuario */}
                   <div className="p-2 max-h-[42dvh] overflow-y-auto">
                     <p className="px-2 py-1.5 text-[0.65rem] uppercase tracking-wider text-surface-200/35 font-semibold">
                       Cambiar de usuario · demo
@@ -199,8 +230,8 @@ export default function Header() {
                               {user.role === 'admin'
                                 ? 'Administrador'
                                 : user.has_booked_slot
-                                  ? 'Con horario'
-                                  : 'Sin horario'}
+                                  ? 'Con reserva'
+                                  : 'Sin reserva'}
                             </span>
                           </span>
                           {isCurrent && (

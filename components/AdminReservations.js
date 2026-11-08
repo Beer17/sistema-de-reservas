@@ -5,9 +5,9 @@ import useStore from '@/lib/store';
 import { DAY_NAMES, WEEK_SHORT } from '@/lib/data';
 
 /**
- * Resumen solo para administradores: muestra todos los horarios
- * seleccionados en la semana, sin importar el día que esté abierto
- * en la agenda, con la opción de liberarlos.
+ * Resumen solo para administradores: muestra todas las reservas
+ * del periodo, sin importar el día que esté abierto
+ * en el sistema, con la opción de liberarlas.
  */
 export default function AdminReservations() {
   const timeSlots = useStore((state) => state.timeSlots);
@@ -70,7 +70,7 @@ export default function AdminReservations() {
               </span>
             </h2>
             <p className="text-xs text-surface-200/45 mt-0.5">
-              Todos los días de la semana ({WEEK_SHORT}) ·{' '}
+              Todos los días del periodo ({WEEK_SHORT}) ·{' '}
               <span className="text-accent-400 font-medium">
                 {reservations.length}
               </span>{' '}
@@ -82,10 +82,10 @@ export default function AdminReservations() {
         {reservations.length === 0 ? (
           <div className="rounded-xl bg-surface-800/30 border border-surface-200/5 p-5 text-center">
             <p className="text-sm text-surface-200/45">
-              Todavía no hay horarios seleccionados.
+              Todavía no hay reservas.
             </p>
             <p className="text-xs text-surface-200/25 mt-1">
-              Cuando un alumno reserve, aparecerá aquí con su nombre y horario.
+              Cuando un usuario reserve, aparecerá aquí con su nombre y horario.
             </p>
           </div>
         ) : (
@@ -104,7 +104,7 @@ export default function AdminReservations() {
 
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-white font-medium leading-tight truncate">
-                      {slot.booked_by_name || 'Alumno'}
+                      {slot.booked_by_name || 'Usuario'}
                       {isMine && (
                         <span className="ml-1.5 text-[0.65rem] font-semibold text-primary-300">
                           (tú)
@@ -163,7 +163,7 @@ export default function AdminReservations() {
               <p className="text-sm text-surface-200/60">
                 Se liberará la reserva de{' '}
                 <span className="text-white font-medium">
-                  {releaseTarget.booked_by_name || 'este alumno'}
+                  {releaseTarget.booked_by_name || 'este usuario'}
                 </span>{' '}
                 y se le avisará por notificación.
               </p>

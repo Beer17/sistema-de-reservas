@@ -9,28 +9,26 @@ const inter = Inter({
 
 export const metadata = {
   title: {
-    default: "Agenda de Entregas",
-    template: "%s · Agenda de Entregas",
+    default: "Sistema de Reservas",
+    template: "%s · Sistema de Reservas",
   },
-  applicationName: "Agenda de Entregas",
+  applicationName: "Sistema de Reservas",
   description:
-    "Plataforma para que los estudiantes programen la presentación de sus entregas en los horarios disponibles. Reserva, reprograma y recibe notificaciones.",
+    "Plataforma para reservar horarios disponibles. Reserva, reprograma y recibe notificaciones.",
   keywords: [
-    "agenda",
-    "entregas",
-    "estudiantes",
+    "reservas",
     "horarios",
-    "universidad",
+    "disponibilidad",
     "programación",
   ],
-  authors: [{ name: "Agenda de Entregas" }],
+  authors: [{ name: "Sistema de Reservas" }],
   openGraph: {
-    title: "Agenda de Entregas",
+    title: "Sistema de Reservas",
     description:
-      "Reserva tu horario de entrega, reprograma y recibe avisos cuando se liberen espacios.",
+      "Reserva tu horario, reprograma y recibe avisos cuando se liberen espacios.",
     type: "website",
     locale: "es_ES",
-    siteName: "Agenda de Entregas",
+    siteName: "Sistema de Reservas",
   },
   robots: {
     index: true,

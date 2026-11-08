@@ -61,9 +61,9 @@ export default function LoginForm() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold gradient-text mb-2">Agenda de Entregas</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold gradient-text mb-2">Sistema de Reservas</h1>
           <p className="text-surface-200/60 text-xs sm:text-sm">
-            Programa tu presentación en el horario que prefieras
+            Reserva tu horario en el momento que prefieras
           </p>
         </div>
 
@@ -71,7 +71,7 @@ export default function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-surface-200/80 mb-2">
-              Correo institucional
+              Correo electrónico
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-200/30" aria-hidden="true">
@@ -86,7 +86,7 @@ export default function LoginForm() {
                 enterKeyHint="next"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="alumno@universidad.edu"
+                placeholder="usuario@empresa.com"
                 className="input-field pl-10"
                 required
                 autoComplete="username"
@@ -217,7 +217,7 @@ export default function LoginForm() {
               Contraseña para todas: <code className="text-primary-400/70">{DEMO_PASSWORD}</code>
             </p>
             <p className="text-[0.65rem] text-center text-surface-200/25 mt-1">
-              Abel García entra como administrador; el resto son alumnos.
+              Abel García entra como administrador; el resto son usuarios.
             </p>
           </div>
 

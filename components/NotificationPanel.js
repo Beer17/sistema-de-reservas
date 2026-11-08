@@ -27,7 +27,7 @@ export default function NotificationPanel() {
   const bookSlot = useStore((state) => state.bookSlot);
   const addToast = useStore((state) => state.addToast);
 
-  // Solo las notificaciones dirigidas al alumno actual
+  // Solo las notificaciones dirigidas al usuario actual
   const myNotifications = useMemo(() => {
     if (!currentUser) return [];
     return notifications.filter((notification) =>
@@ -86,7 +86,7 @@ export default function NotificationPanel() {
       addToast({
         type: 'error',
         title: 'Horario no disponible',
-        message: result.error || 'Ese horario ya fue ocupado por otro compañero.',
+        message: result.error || 'Ese horario ya fue ocupado por otro usuario.',
       });
     }
   };

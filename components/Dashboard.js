@@ -13,6 +13,7 @@ export default function Dashboard() {
   const isAuthenticated = useStore((state) => state.isAuthenticated);
   const currentUser = useStore((state) => state.currentUser);
   const timeSlots = useStore((state) => state.timeSlots);
+  const cloudStatus = useStore((state) => state.cloudStatus);
 
   if (!isAuthenticated || !currentUser) {
     return <LoginForm />;
@@ -51,6 +52,21 @@ export default function Dashboard() {
       <Header />
 
       <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8">
+        {cloudStatus === 'local' && (
+          <div className="mb-4 rounded-xl border border-warning-500/30 bg-warning-500/10 px-4 py-3 text-xs sm:text-sm text-warning-400">
+            <p className="font-semibold mb-0.5">Modo local: no se ve entre dispositivos</p>
+            <p className="text-warning-400/80">
+              Configura <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code> y{' '}
+              <code className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> en Vercel para que la reserva de Juanito se vea en tu perfil de Abel.
+              Ver <code className="font-mono">.env.example</code> y <code className="font-mono">supabase/schema.sql</code>.
+            </p>
+          </div>
+        )}
+        {cloudStatus === 'error' && (
+          <div className="mb-4 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-xs sm:text-sm text-danger-400">
+            No se pudo sincronizar con la nube. Revisa las variables de Supabase y reintenta.
+          </div>
+        )}
         <div className="glass-card rounded-2xl p-4 sm:p-6">
           {/* Saludo */}
           <div className="mb-6 sm:mb-8 animate-fade-in-up">
@@ -71,14 +87,14 @@ export default function Dashboard() {
             <p className="text-sm sm:text-base text-surface-200/50">
               {mySlot ? (
                 <>
-                  Tu entrega está agendada para el{' '}
+                  Tu reserva está confirmada para el{' '}
                   <span className="text-white font-medium">
                     {DAY_NAMES[mySlot.date] || mySlot.date}
                   </span>{' '}
                   de {mySlot.start_time} a {mySlot.end_time}.
                 </>
               ) : (
-                'Elige el horario que prefieras para presentar tu entrega.'
+                'Elige el horario que prefieras para hacer tu reserva.'
               )}
             </p>
             {currentUser.role === 'admin' && (
@@ -101,7 +117,7 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[0.65rem] sm:text-xs text-surface-200/40 uppercase tracking-wider">Semana</p>
+                  <p className="text-[0.65rem] sm:text-xs text-surface-200/40 uppercase tracking-wider">Periodo</p>
                   <p className="text-xs sm:text-sm font-semibold text-white truncate">{WEEK_SHORT}</p>
                 </div>
               </div>
@@ -130,7 +146,7 @@ export default function Dashboard() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[0.65rem] sm:text-xs text-surface-200/40 uppercase tracking-wider">Límite</p>
-                  <p className="text-xs sm:text-sm font-semibold text-white truncate">1 reserva por alumno</p>
+                  <p className="text-xs sm:text-sm font-semibold text-white truncate">1 reserva por usuario</p>
                 </div>
               </div>
             </div>
@@ -147,7 +163,7 @@ export default function Dashboard() {
       {/* Footer */}
       <footer className="relative z-10 border-t border-surface-200/5 py-4 text-center">
         <p className="text-[0.7rem] text-surface-200/25 px-4">
-          Sistema de Programación de Entregas © 2026 — Prototipo
+          Sistema de Reservas © 2026 — Prototipo
         </p>
       </footer>
 

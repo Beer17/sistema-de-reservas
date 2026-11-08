@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import useStore from '@/lib/store';
+import { isCloudConfigured } from '@/lib/supabase';
 
 /**
- * Espera a que Zustand termine de leer localStorage antes de pintar la app.
+ * Espera a que Zustand termine de leer localStorage (caché) y,
+ * si Supabase está configurado, a la primera sincronización en la nube.
  * Evita parpadeos y desajustes de hidratación entre servidor y cliente.
  */
 export default function StoreHydration({ children }) {
@@ -12,29 +14,48 @@ export default function StoreHydration({ children }) {
 
   useEffect(() => {
     let cancelled = false;
+    let cleanupCloud = () => {};
 
-    const finish = () => {
+    const readyFromCache = () => {
       if (!cancelled) setReady(true);
     };
 
-    if (useStore.persist.hasHydrated()) {
-      finish();
-    }
-
-    const unsubscribe = useStore.persist.onFinishHydration(finish);
-
-    try {
-      const result = useStore.persist.rehydrate();
-      if (result && typeof result.catch === 'function') {
-        result.catch(finish);
+    const start = async () => {
+      // 1) Caché local primero (pintado rápido)
+      if (useStore.persist.hasHydrated()) {
+        readyFromCache();
+      } else {
+        const unsub = useStore.persist.onFinishHydration(readyFromCache);
+        try {
+          const result = useStore.persist.rehydrate();
+          if (result && typeof result.catch === 'function') result.catch(readyFromCache);
+        } catch {
+          readyFromCache();
+        }
+        // Si en 800ms no llega nada, pintamos igual
+        const t = setTimeout(readyFromCache, 800);
+        return () => {
+          cancelled = true;
+          clearTimeout(t);
+          unsub?.();
+        };
       }
-    } catch {
-      finish();
-    }
+
+      // 2) Sincronización en la nube (compartida entre dispositivos)
+      try {
+        cleanupCloud = await useStore.getState().initCloudSync();
+      } catch {
+        // La app sigue en modo local si falla la red/nube
+      }
+
+      readyFromCache();
+    };
+
+    start();
 
     return () => {
       cancelled = true;
-      unsubscribe?.();
+      cleanupCloud();
     };
   }, []);
 
@@ -61,7 +82,11 @@ export default function StoreHydration({ children }) {
             />
           </svg>
         </div>
-        <p className="text-sm text-surface-200/50">Cargando tu agenda…</p>
+        <p className="text-sm text-surface-200/50">
+          {isCloudConfigured()
+            ? 'Sincronizando reservas…'
+            : 'Cargando el sistema de reservas…'}
+        </p>
       </div>
     );
   }

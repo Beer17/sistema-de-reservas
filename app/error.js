@@ -11,7 +11,7 @@ export default function Error({ error, reset }) {
         </div>
         <h1 className="text-xl font-bold text-white mb-2">Algo salió mal</h1>
         <p className="text-sm text-surface-200/50 mb-6">
-          Ocurrió un error inesperado al cargar la agenda. Puedes intentarlo de nuevo.
+          Ocurrió un error inesperado al cargar el sistema. Puedes intentarlo de nuevo.
         </p>
         {error?.digest && (
           <p className="text-[0.7rem] text-surface-200/25 mb-4 font-mono">

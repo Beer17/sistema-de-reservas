@@ -214,8 +214,8 @@ export default function ScheduleGrid() {
                     : status === 'mine'
                       ? 'Tu reserva, pulsa para cancelar'
                       : isAdmin
-                        ? `Reservado por ${slot.booked_by_name || 'otro alumno'}. Pulsa para liberar la reserva`
-                        : `Reservado por ${slot.booked_by_name || 'otro alumno'}`
+                        ? `Reservado por ${slot.booked_by_name || 'otro usuario'}. Pulsa para liberar la reserva`
+                        : `Reservado por ${slot.booked_by_name || 'otro usuario'}`
                 }`}
                 className={`text-left w-full rounded-xl p-3 sm:p-4 animate-fade-in-up stagger-${(index % 8) + 1} ${
                   status === 'available' ? 'slot-available' : ''
@@ -315,7 +315,7 @@ export default function ScheduleGrid() {
                 Confirmar reserva
               </h3>
               <p className="text-sm text-surface-200/60">
-                ¿Deseas reservar este horario para tu entrega?
+                ¿Deseas reservar este horario?
               </p>
             </div>
 
@@ -343,7 +343,7 @@ export default function ScheduleGrid() {
                 </svg>
                 <span>
                   Ya tienes una reserva ({DAY_NAMES[mySlot.date] || mySlot.date}, {mySlot.start_time}).
-                  Se cancelará automáticamente y se avisará a tus compañeros.
+                  Se cancelará automáticamente y se avisará a los demás usuarios.
                 </span>
               </div>
             )}
@@ -384,7 +384,7 @@ export default function ScheduleGrid() {
                 ¿Cancelar tu reserva?
               </h3>
               <p className="text-sm text-surface-200/60">
-                El horario quedará libre y se avisará a los compañeros sin horario.
+                El horario quedará libre y se avisará a los usuarios sin reserva.
               </p>
             </div>
 
@@ -420,7 +420,7 @@ export default function ScheduleGrid() {
         </div>
       )}
 
-      {/* Modal: liberar reserva de otro alumno (solo admin) */}
+      {/* Modal: liberar reserva de otro usuario (solo admin) */}
       {releaseModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm"
@@ -446,7 +446,7 @@ export default function ScheduleGrid() {
               <p className="text-sm text-surface-200/60">
                 Esta reserva pertenece a{' '}
                 <span className="text-white font-medium">
-                  {releaseModal.booked_by_name || 'otro alumno'}
+                  {releaseModal.booked_by_name || 'otro usuario'}
                 </span>
                 . Se le avisará por notificación.
               </p>
@@ -474,7 +474,7 @@ export default function ScheduleGrid() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
               </svg>
               <span>
-                El horario quedará libre y también se avisará a los compañeros sin horario.
+                El horario quedará libre y también se avisará a los usuarios sin reserva.
               </span>
             </div>
 
