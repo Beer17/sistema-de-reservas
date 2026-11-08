@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import useStore from '@/lib/store';
-import { DAY_NAMES, SLOTS_PER_DAY, WEEK_DATES, WEEK_LABEL } from '@/lib/data';
+import {
+  DAY_NAMES,
+  MAX_BOOKINGS_PER_USER,
+  SLOTS_PER_DAY,
+  WEEK_DATES,
+  WEEK_LABEL,
+} from '@/lib/data';
 
 export default function ScheduleGrid() {
   const timeSlots = useStore((state) => state.timeSlots);
@@ -18,9 +24,13 @@ export default function ScheduleGrid() {
 
   const isAdmin = currentUser?.role === 'admin';
 
-  const mySlot = useMemo(() => {
-    if (!currentUser?.booked_slot_id) return null;
-    return timeSlots.find((slot) => slot.id === currentUser.booked_slot_id) || null;
+  const mySlots = useMemo(() => {
+    if (!currentUser) return [];
+    return timeSlots
+      .filter((slot) => slot.booked_by === currentUser.id)
+      .sort((a, b) =>
+        `${a.date} ${a.start_time}`.localeCompare(`${b.date} ${b.start_time}`)
+      );
   }, [currentUser, timeSlots]);
 
   const filteredSlots = useMemo(
@@ -122,36 +132,39 @@ export default function ScheduleGrid() {
         </div>
       </div>
 
-      {/* Mi reserva actual */}
-      {mySlot && (
+      {/* Mis reservas activas */}
+      {mySlots.length > 0 && (
         <div className="glass-card rounded-2xl p-4 sm:p-5 border-l-4 border-l-primary-500 animate-fade-in-up">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-xl bg-primary-500/20 flex items-center justify-center">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[0.7rem] sm:text-xs text-surface-200/50 uppercase tracking-wider font-medium">
-                  Tu reserva actual
-                </p>
-                <p className="text-sm sm:text-lg font-bold text-white truncate">
-                  {DAY_NAMES[mySlot.date] || mySlot.date} · {mySlot.start_time} – {mySlot.end_time}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setCancelModal(mySlot)}
-              className="btn-danger flex items-center justify-center gap-2 text-sm w-full sm:w-auto shrink-0"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Cancelar reserva
-            </button>
-          </div>
+          <p className="text-[0.7rem] sm:text-xs text-surface-200/50 uppercase tracking-wider font-medium mb-3">
+            Tus reservas ({mySlots.length}/{MAX_BOOKINGS_PER_USER})
+          </p>
+          <ul className="space-y-2">
+            {mySlots.map((slot) => (
+              <li
+                key={slot.id}
+                className="flex items-center justify-between gap-3 rounded-xl bg-surface-800/40 border border-surface-200/5 px-3 py-2.5"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <svg className="w-4 h-4 text-primary-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm font-semibold text-white truncate">
+                    {DAY_NAMES[slot.date] || slot.date} · {slot.start_time} – {slot.end_time}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCancelModal(slot)}
+                  className="shrink-0 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-danger-400 bg-danger-500/10 hover:bg-danger-500/20 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Cancelar
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -336,14 +349,15 @@ export default function ScheduleGrid() {
               </div>
             </div>
 
-            {mySlot && (
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-warning-500/10 border border-warning-500/20 text-warning-400 text-xs sm:text-sm mb-5 sm:mb-6">
+            {mySlots.length > 0 && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-primary-500/10 border border-primary-500/20 text-primary-300 text-xs sm:text-sm mb-5 sm:mb-6">
                 <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                 </svg>
                 <span>
-                  Ya tienes una reserva ({DAY_NAMES[mySlot.date] || mySlot.date}, {mySlot.start_time}).
-                  Se cancelará automáticamente y se avisará a los demás usuarios.
+                  Ya tienes {mySlots.length} reserva{mySlots.length === 1 ? '' : 's'} activa
+                  {mySlots.length === 1 ? '' : 's'} de {MAX_BOOKINGS_PER_USER} permitidas.
+                  Esta se añadirá como una más.
                 </span>
               </div>
             )}

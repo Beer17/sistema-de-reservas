@@ -7,7 +7,7 @@ import LoginForm from '@/components/LoginForm';
 import ScheduleGrid from '@/components/ScheduleGrid';
 import ToastContainer from '@/components/ToastContainer';
 import AdminReservations from '@/components/AdminReservations';
-import { DAY_NAMES, WEEK_LABEL, WEEK_SHORT } from '@/lib/data';
+import { DAY_NAMES, MAX_BOOKINGS_PER_USER, WEEK_LABEL, WEEK_SHORT } from '@/lib/data';
 
 export default function Dashboard() {
   const isAuthenticated = useStore((state) => state.isAuthenticated);
@@ -19,9 +19,10 @@ export default function Dashboard() {
     return <LoginForm />;
   }
 
-  const mySlot = currentUser.booked_slot_id
-    ? timeSlots.find((slot) => slot.id === currentUser.booked_slot_id)
-    : null;
+  const mySlots = timeSlots
+    .filter((slot) => slot.booked_by === currentUser.id)
+    .sort((a, b) => `${a.date} ${a.start_time}`.localeCompare(`${b.date} ${b.start_time}`));
+  const mySlot = mySlots[0] || null;
 
   return (
     <div className="min-h-dvh flex flex-col bg-grid relative overflow-x-hidden">
@@ -85,7 +86,9 @@ export default function Dashboard() {
               )}
             </h1>
             <p className="text-sm sm:text-base text-surface-200/50">
-              {mySlot ? (
+              {mySlots.length === 0 ? (
+                'Elige el horario que prefieras para hacer tu reserva. Puedes tener varias activas.'
+              ) : mySlots.length === 1 ? (
                 <>
                   Tu reserva está confirmada para el{' '}
                   <span className="text-white font-medium">
@@ -94,7 +97,12 @@ export default function Dashboard() {
                   de {mySlot.start_time} a {mySlot.end_time}.
                 </>
               ) : (
-                'Elige el horario que prefieras para hacer tu reserva.'
+                <>
+                  Tienes{' '}
+                  <span className="text-white font-medium">{mySlots.length} reservas confirmadas</span>.
+                  Próxima: {DAY_NAMES[mySlot.date] || mySlot.date} de {mySlot.start_time} a{' '}
+                  {mySlot.end_time}.
+                </>
               )}
             </p>
             {currentUser.role === 'admin' && (
@@ -146,7 +154,9 @@ export default function Dashboard() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[0.65rem] sm:text-xs text-surface-200/40 uppercase tracking-wider">Límite</p>
-                  <p className="text-xs sm:text-sm font-semibold text-white truncate">1 reserva por usuario</p>
+                  <p className="text-xs sm:text-sm font-semibold text-white truncate">
+                    Hasta {MAX_BOOKINGS_PER_USER} por usuario
+                  </p>
                 </div>
               </div>
             </div>

@@ -129,9 +129,18 @@ export default function Header() {
                   <span className="block text-xs text-surface-200/40 leading-tight truncate">
                     {isAdmin
                       ? 'Administrador'
-                      : currentUser.has_booked_slot
-                        ? 'Con reserva'
-                        : 'Sin reserva'}
+                      : (() => {
+                          const count = Array.isArray(currentUser.booked_slot_ids)
+                            ? currentUser.booked_slot_ids.length
+                            : currentUser.has_booked_slot
+                              ? 1
+                              : 0;
+                          return count === 0
+                            ? 'Sin reserva'
+                            : count === 1
+                              ? 'Con reserva'
+                              : `${count} reservas`;
+                        })()}
                   </span>
                 </span>
                 <span className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs sm:text-sm font-bold shadow-md shadow-primary-500/20">
@@ -185,7 +194,18 @@ export default function Header() {
                           currentUser.has_booked_slot ? 'bg-primary-400' : 'bg-surface-200/30'
                         }`}
                       />
-                      {currentUser.has_booked_slot ? 'Reserva activa' : 'Sin reserva'}
+                      {(() => {
+                        const count = Array.isArray(currentUser.booked_slot_ids)
+                          ? currentUser.booked_slot_ids.length
+                          : currentUser.has_booked_slot
+                            ? 1
+                            : 0;
+                        return count === 0
+                          ? 'Sin reserva'
+                          : count === 1
+                            ? 'Reserva activa'
+                            : `${count} reservas activas`;
+                      })()}
                     </span>
                   </div>
 
@@ -229,9 +249,18 @@ export default function Header() {
                             >
                               {user.role === 'admin'
                                 ? 'Administrador'
-                                : user.has_booked_slot
-                                  ? 'Con reserva'
-                                  : 'Sin reserva'}
+                                : (() => {
+                                    const count = Array.isArray(user.booked_slot_ids)
+                                      ? user.booked_slot_ids.length
+                                      : user.has_booked_slot
+                                        ? 1
+                                        : 0;
+                                    return count === 0
+                                      ? 'Sin reserva'
+                                      : count === 1
+                                        ? 'Con reserva'
+                                        : `${count} reservas`;
+                                  })()}
                             </span>
                           </span>
                           {isCurrent && (
