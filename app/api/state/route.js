@@ -47,7 +47,12 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       state,
-      storage: { driver: driver.name, label: driver.label },
+      storage: {
+        driver: driver.name,
+        label: driver.label,
+        // Compatibilidad con despliegues/clientes que esperen "name".
+        name: driver.label,
+      },
     });
   } catch (error) {
     return NextResponse.json(

@@ -36,8 +36,9 @@ Las variables se aplican en nuevos despliegues:
 
 1. Abre `https://<tu-app>/api/state` y comprueba que la respuesta incluya:
    ```json
-   "storage": { "driver": "blob", "label": "Vercel Blob" }
+   "storage": { "driver": "blob", "label": "Vercel Blob", "name": "Vercel Blob" }
    ```
+   (`name` es un alias de `label` por compatibilidad.)
    Si ves `"driver":"fs"`, las variables no llegaron al entorno desplegado o falta `DATA_DRIVER`/token: revisa el entorno (Production/Preview) y redeploya.
 2. Entra a la app y realiza una reserva/cancelación (ya no debe aparecer `No se pudo reservar` / `EROFS`).
 3. Revisa los archivos en **Storage → `<tu-store>` → Browser**: deben existir dentro de `data/` (`users.json`, `time_slots.json`, `notifications.json`, `meta.json`). También puedes listarlos con:
