@@ -10,6 +10,7 @@ import {
   resetDemo,
 } from '@/lib/booking';
 import { buildSeedState, readState, updateState } from '@/lib/json-store';
+import { getStorageDriver } from '@/lib/storage';
 
 /**
  * ==========================================
@@ -40,8 +41,14 @@ export async function GET() {
   await io();
 
   try {
-    const state = await readState();
-    return NextResponse.json({ ok: true, state });
+    const { etag, ...state } = await readState();
+    const driver = getStorageDriver();
+
+    return NextResponse.json({
+      ok: true,
+      state,
+      storage: { driver: driver.name, label: driver.label },
+    });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error?.message || 'No se pudo leer el estado.' },
@@ -119,6 +126,17 @@ export async function POST(request) {
       ownerName: result.ownerName ?? null,
     });
   } catch (error) {
+    // Dos dispositivos guardaron a la vez: el cliente recarga y reintenta.
+    if (error?.status === 409 || error?.name === 'ConflictError') {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Otro dispositivo guardó un cambio al mismo tiempo. Vuelve a intentarlo.',
+        },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
       { ok: false, error: error?.message || 'Error inesperado en el servidor.' },
       { status: 500 }

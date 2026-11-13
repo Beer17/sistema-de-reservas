@@ -13,6 +13,7 @@ export default function Header() {
   const addToast = useStore((state) => state.addToast);
   const syncStatus = useStore((state) => state.syncStatus);
   const lastSyncedAt = useStore((state) => state.lastSyncedAt);
+  const storageLabel = useStore((state) => state.storageLabel);
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -104,7 +105,9 @@ export default function Header() {
               className="hidden md:inline-flex items-center gap-1.5 mr-1 px-2.5 py-1 rounded-lg bg-surface-800/50 border border-surface-200/10 text-[0.7rem] text-surface-200/50"
               title={
                 lastSyncedAt
-                  ? `Última sincronización: ${new Date(lastSyncedAt).toLocaleTimeString('es')}`
+                  ? `Última sincronización: ${new Date(lastSyncedAt).toLocaleTimeString('es')}${
+                      storageLabel ? `\nGuardado en: ${storageLabel}` : ''
+                    }`
                   : 'Estado de sincronización'
               }
             >

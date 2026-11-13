@@ -2,15 +2,18 @@
   "name": "sistema-reservas",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "data:reset": "node scripts/reset-data.mjs",
-    "data:info": "node scripts/reset-data.mjs --info"
+    "data:info": "node scripts/reset-data.mjs --info",
+    "test:blob": "node scripts/test-blob-driver.mjs"
   },
   "dependencies": {
+    "@vercel/blob": "^2.9.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
