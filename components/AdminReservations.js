@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import useStore from '@/lib/store';
-import { DAY_NAMES, WEEK_SHORT } from '@/lib/data';
+import { buildScheduleMeta } from '@/lib/schedule';
 
 /**
  * Resumen solo para administradores: muestra todas las reservas
@@ -25,6 +25,11 @@ export default function AdminReservations() {
 
   const isAdmin = currentUser?.role === 'admin';
 
+  const { dayNames, weekShort } = useMemo(
+    () => buildScheduleMeta(timeSlots),
+    [timeSlots]
+  );
+
   // Cerrar el modal con Escape
   useEffect(() => {
     if (!releaseTarget) return;
@@ -41,9 +46,9 @@ export default function AdminReservations() {
   const avatarFor = (slot) =>
     users.find((user) => user.id === slot.booked_by)?.avatar || '??';
 
-  const confirmRelease = () => {
+  const confirmRelease = async () => {
     if (!releaseTarget) return;
-    const result = cancelSlot(releaseTarget.id);
+    const result = await cancelSlot(releaseTarget.id);
     setReleaseTarget(null);
 
     if (!result.success) {
@@ -70,7 +75,7 @@ export default function AdminReservations() {
               </span>
             </h2>
             <p className="text-xs text-surface-200/45 mt-0.5">
-              Todos los días del periodo ({WEEK_SHORT}) ·{' '}
+              Todos los días del periodo ({weekShort}) ·{' '}
               <span className="text-accent-400 font-medium">
                 {reservations.length}
               </span>{' '}
@@ -112,7 +117,7 @@ export default function AdminReservations() {
                       )}
                     </p>
                     <p className="text-[0.7rem] sm:text-xs text-surface-200/45 leading-tight mt-0.5 truncate">
-                      {DAY_NAMES[slot.date] || slot.date} · {slot.start_time} –{' '}
+                      {dayNames[slot.date] || slot.date} · {slot.start_time} –{' '}
                       {slot.end_time}
                     </p>
                   </div>
@@ -174,7 +179,7 @@ export default function AdminReservations() {
                 <div className="min-w-0">
                   <p className="text-xs text-surface-200/40 mb-0.5">Fecha</p>
                   <p className="text-sm text-white font-semibold truncate">
-                    {DAY_NAMES[releaseTarget.date] || releaseTarget.date}
+                    {dayNames[releaseTarget.date] || releaseTarget.date}
                   </p>
                 </div>
                 <div className="text-right shrink-0">

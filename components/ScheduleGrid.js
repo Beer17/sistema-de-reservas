@@ -2,13 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import useStore from '@/lib/store';
-import {
-  DAY_NAMES,
-  MAX_BOOKINGS_PER_USER,
-  SLOTS_PER_DAY,
-  WEEK_DATES,
-  WEEK_LABEL,
-} from '@/lib/data';
+import { MAX_BOOKINGS_PER_USER } from '@/lib/data';
+import { buildScheduleMeta } from '@/lib/schedule';
 
 export default function ScheduleGrid() {
   const timeSlots = useStore((state) => state.timeSlots);
@@ -17,10 +12,20 @@ export default function ScheduleGrid() {
   const cancelSlot = useStore((state) => state.cancelSlot);
   const addToast = useStore((state) => state.addToast);
 
-  const [selectedDate, setSelectedDate] = useState(WEEK_DATES[0]);
+  // La agenda se deriva de los horarios guardados en `data/time_slots.json`.
+  const { dates, dayNames, weekLabel, slotsPerDay } = useMemo(
+    () => buildScheduleMeta(timeSlots),
+    [timeSlots]
+  );
+
+  const [selectedDate, setSelectedDate] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
   const [cancelModal, setCancelModal] = useState(null);
   const [releaseModal, setReleaseModal] = useState(null);
+
+  // Si el servidor cambia los días disponibles, se muestra el primero.
+  const activeDate =
+    selectedDate && dates.includes(selectedDate) ? selectedDate : dates[0] ?? null;
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -33,10 +38,7 @@ export default function ScheduleGrid() {
       );
   }, [currentUser, timeSlots]);
 
-  const filteredSlots = useMemo(
-    () => timeSlots.filter((slot) => slot.date === selectedDate),
-    [timeSlots, selectedDate]
-  );
+  const filteredSlots = timeSlots.filter((slot) => slot.date === activeDate);
 
   const stats = useMemo(() => {
     const total = timeSlots.length;
@@ -59,9 +61,9 @@ export default function ScheduleGrid() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [confirmModal, cancelModal, releaseModal]);
 
-  const confirmBooking = () => {
+  const confirmBooking = async () => {
     if (!confirmModal) return;
-    const result = bookSlot(confirmModal.id);
+    const result = await bookSlot(confirmModal.id);
     setConfirmModal(null);
     if (!result.success) {
       addToast({
@@ -72,9 +74,9 @@ export default function ScheduleGrid() {
     }
   };
 
-  const confirmCancel = () => {
+  const confirmCancel = async () => {
     if (!cancelModal) return;
-    const result = cancelSlot(cancelModal.id);
+    const result = await cancelSlot(cancelModal.id);
     setCancelModal(null);
     if (!result.success) {
       addToast({
@@ -85,9 +87,9 @@ export default function ScheduleGrid() {
     }
   };
 
-  const confirmRelease = () => {
+  const confirmRelease = async () => {
     if (!releaseModal) return;
-    const result = cancelSlot(releaseModal.id);
+    const result = await cancelSlot(releaseModal.id);
     setReleaseModal(null);
     if (!result.success) {
       addToast({
@@ -113,7 +115,7 @@ export default function ScheduleGrid() {
           <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">
             Horarios disponibles
           </h2>
-          <p className="text-surface-200/50 text-xs sm:text-sm">{WEEK_LABEL}</p>
+          <p className="text-surface-200/50 text-xs sm:text-sm">{weekLabel}</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -149,7 +151,7 @@ export default function ScheduleGrid() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="text-sm font-semibold text-white truncate">
-                    {DAY_NAMES[slot.date] || slot.date} · {slot.start_time} – {slot.end_time}
+                    {dayNames[slot.date] || slot.date} · {slot.start_time} – {slot.end_time}
                   </p>
                 </div>
                 <button
@@ -170,10 +172,10 @@ export default function ScheduleGrid() {
 
       {/* Selector de días */}
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2 no-scrollbar snap-x">
-        {WEEK_DATES.map((date) => {
+        {dates.map((date) => {
           const daySlots = timeSlots.filter((slot) => slot.date === date);
           const dayAvailable = daySlots.filter((slot) => slot.is_available).length;
-          const isActive = selectedDate === date;
+          const isActive = activeDate === date;
 
           return (
             <button
@@ -188,7 +190,7 @@ export default function ScheduleGrid() {
               }`}
             >
               <p className={`text-[0.7rem] sm:text-xs uppercase tracking-wider mb-1 ${isActive ? 'text-primary-400' : 'text-surface-200/40'}`}>
-                {DAY_NAMES[date]}
+                {dayNames[date]}
               </p>
               <p className={`text-base sm:text-lg font-bold leading-tight ${isActive ? 'text-white' : 'text-surface-200/70'}`}>
                 {date.split('-')[2]}
@@ -300,7 +302,7 @@ export default function ScheduleGrid() {
           <span>Mi reserva</span>
         </div>
         <span className="text-surface-200/25 sm:ml-auto">
-          {SLOTS_PER_DAY} bloques por día · 30 min
+          {slotsPerDay} bloques por día · 30 min
         </span>
       </div>
 
@@ -337,7 +339,7 @@ export default function ScheduleGrid() {
                 <div className="min-w-0">
                   <p className="text-xs text-surface-200/40 mb-0.5">Fecha</p>
                   <p className="text-sm sm:text-base text-white font-semibold truncate">
-                    {DAY_NAMES[confirmModal.date] || confirmModal.date}
+                    {dayNames[confirmModal.date] || confirmModal.date}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
@@ -407,7 +409,7 @@ export default function ScheduleGrid() {
                 <div className="min-w-0">
                   <p className="text-xs text-surface-200/40 mb-0.5">Fecha</p>
                   <p className="text-sm sm:text-base text-white font-semibold truncate">
-                    {DAY_NAMES[cancelModal.date] || cancelModal.date}
+                    {dayNames[cancelModal.date] || cancelModal.date}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
@@ -471,7 +473,7 @@ export default function ScheduleGrid() {
                 <div className="min-w-0">
                   <p className="text-xs text-surface-200/40 mb-0.5">Fecha</p>
                   <p className="text-sm sm:text-base text-white font-semibold truncate">
-                    {DAY_NAMES[releaseModal.date] || releaseModal.date}
+                    {dayNames[releaseModal.date] || releaseModal.date}
                   </p>
                 </div>
                 <div className="text-right shrink-0">

@@ -62,4 +62,8 @@ jobs:
           app-name: 'my-webapp-af0980c8'
           slot-name: 'Production'
           package: .
+          # Los datos del sistema se guardan en archivos JSON.
+          # /home/data es persistente en Azure App Service (Linux y Windows).
+          app-settings: |
+            DATA_DIR=/home/data
           

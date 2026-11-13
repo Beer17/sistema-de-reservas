@@ -6,11 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "data:reset": "node scripts/reset-data.mjs",
+    "data:info": "node scripts/reset-data.mjs --info"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.119.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",

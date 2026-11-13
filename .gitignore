@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# archivos json de datos
+# (los .json se versionan para poder editarlos a mano; los temporales no)
+/data/*.tmp
+/data/*.invalid-*
+
 # vercel
 .vercel
 

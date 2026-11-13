@@ -1,8 +1,17 @@
 # Sistema de Reservas
 
-Sistema de reservas de horarios con sincronización compartida entre dispositivos. Los usuarios reservan bloques de 30 minutos, reprograman o cancelan, y reciben notificaciones cuando se libera un espacio.
+Sistema de reservas de horarios con **persistencia en archivos JSON** (sin base de datos). Los usuarios reservan bloques de 30 minutos, cancelan y reciben notificaciones cuando se libera un espacio.
 
-**Sincronización:** con Supabase configurado, una reserva hecha en un móvil se ve al instante en otro perfil (por ejemplo: Juanito reserva desde su celular y Abel lo ve en el suyo). Sin configuración, el sistema funciona en modo local (solo en ese navegador) para demos rápidas.
+Los datos viven en la carpeta `data/` del servidor, en archivos JSON legibles y editables a mano:
+
+```
+data/users.json         → los usuarios (nombre, correo, contraseña, rol)
+data/time_slots.json    → los horarios y quién tiene cada uno
+data/notifications.json → las notificaciones
+data/meta.json          → metadatos (fecha de escritura y número de revisión)
+```
+
+Todos los dispositivos ven **la misma información** porque leen y escriben los mismos archivos del servidor. No hay servicio externo que configurar, ni claves, ni panel: se edita un JSON y listo.
 
 ---
 
@@ -23,49 +32,174 @@ En el login puedes tocar cualquier cuenta para autocompletar el formulario.
 ### Roles
 
 - **Administrador (Abel):** puede liberar la reserva de cualquier usuario y es el único que puede usar **Reiniciar demo**.
-- **Usuario (resto):** solo puede reservar, reprogramar y cancelar su propia reserva.
+- **Usuario (resto):** solo puede reservar y cancelar su propia reserva.
 
-El rol se define en `DEMO_USERS` (`lib/data.js`) y se normaliza al iniciar sesión, así que una sesión vieja guardada en el navegador no puede cambiar los permisos.
+Los roles se leen de `data/users.json`. Si editas ese archivo a mano, el cambio se aplica en el siguiente arranque (la app vuelve a leer los archivos).
 
-### Probar la sincronización entre dispositivos
+### Probarlo entre dispositivos
 
-1. Configura Supabase (ver sección siguiente) y despliega en Vercel con las variables de entorno.
-2. Abre la URL en dos dispositivos o navegadores.
+1. Arranca el servidor (`npm run dev` o `npm start`).
+2. Abre la URL en dos navegadores (o dispositivos de la misma red).
 3. Entra como **María** en uno y reserva un horario.
-4. Entra como **Abel** en el otro: verás la reserva de María sin recargar (Realtime) o como máximo en 3 segundos (polling de respaldo).
+4. Entra como **Abel** en el otro: verás la reserva de María sin recargar (el sondeo refresca cada 3 s).
 5. Cancela o libera esa reserva: el otro dispositivo se actualiza y la campana de notificaciones avisa a los usuarios sin reserva.
 
-El menú del avatar también permite cambiar de usuario y **Cerrar sesión**. La opción **Reiniciar demo** (borra reservas y notificaciones) solo aparece para el administrador y también se sincroniza.
+El menú del avatar permite cambiar de usuario y **Cerrar sesión**. **Reiniciar demo** (borra reservas y notificaciones) solo aparece para el administrador.
 
 ---
 
-## Sincronización compartida (Supabase)
+## Archivos JSON (el "almacén" del sistema)
 
-### Por qué hace falta una base de datos
+### Formato de los archivos
 
-Next.js en Vercel es *stateless*: no guarda información entre despliegues. Si el sistema viviera solo en `localStorage`, cada celular vería sus propias reservas. Para que **todos vean lo mismo** se necesita una base de datos compartida en la nube.
+`data/users.json`:
 
-Este proyecto usa **Supabase** (Postgres + Realtime) con una tabla de un solo documento (`app_state`) para mantener simple la lógica actual. Plan gratuito suficiente para demos.
+```json
+[
+  {
+    "id": "user-001",
+    "name": "Abel García",
+    "email": "abel@empresa.com",
+    "password": "1234",
+    "avatar": "AG",
+    "role": "admin",
+    "has_booked_slot": false,
+    "booked_slot_id": null,
+    "booked_slot_ids": []
+  }
+]
+```
 
-### Configuración en 3 pasos (una sola vez)
+`data/time_slots.json`:
 
-1. **Crea un proyecto gratuito** en <https://supabase.com> → anota tu `URL` y `anon key` (Project Settings → API).
-2. **Crea la tabla:** en Supabase abre **SQL Editor**, pega todo el contenido de `supabase/schema.sql` y pulsa **Run**. Esto crea `public.app_state` y habilita Realtime.
-3. **Configura Vercel:** en Vercel → tu proyecto → **Settings → Environment Variables**, crea:
-   - `NEXT_PUBLIC_SUPABASE_URL` = tu URL de Supabase
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = tu anon key
-   Luego vuelve a desplegar (**Deployments → Redeploy** o un nuevo push).
+```json
+[
+  {
+    "id": "slot-001",
+    "date": "2026-11-02",
+    "start_time": "09:00",
+    "end_time": "09:30",
+    "is_available": true,
+    "booked_by": null,
+    "booked_by_name": null,
+    "version": 1,
+    "created_at": "2026-11-01T10:00:00.000Z"
+  }
+]
+```
 
-Para desarrollo local, copia `.env.example` como `.env.local` y rellena los mismos valores.
+`data/notifications.json`:
 
-> **Si no configuras Supabase**, la app sigue funcionando en **modo local**: la cabecera muestra un aviso “Modo local” y cada navegador tendrá su propio estado. Es útil para probar la interfaz sin salir a producción.
+```json
+[
+  {
+    "id": "notif-abc123",
+    "type": "slot_freed",
+    "title": "Horario liberado",
+    "message": "Se liberó el Lunes 2 de 09:00 a 09:30. ¡Reserva antes de que lo haga otro usuario!",
+    "slot_id": "slot-001",
+    "slot_date": "2026-11-02",
+    "slot_time": "09:00 - 09:30",
+    "target_user_ids": ["user-003"],
+    "read_by": [],
+    "created_at": "2026-11-02T08:15:00.000Z"
+  }
+]
+```
 
-### Cómo funciona el sincronizado
+### Reglas
 
-- **Fuente de verdad:** la fila `id=1` de `public.app_state` con `payload = { users, timeSlots, notifications, updatedAt, clientId }`.
-- **Subida:** cada reserva/cancelación/notificación dispara una subida (debounce 400 ms) con `upsert`.
-- **Bajada:** al iniciar se trae el estado remoto; luego se escucha por **Realtime** (`postgres_changes`) y con **polling cada 3 segundos** como respaldo.
-- **La sesión** (quién soy yo) sigue siendo local por navegador. Lo que se comparte son las reservas, usuarios y notificaciones.
+- **`time_slots.json` es la fuente de verdad de las reservas.** Los campos `booked_slot_id` / `booked_slot_ids` / `has_booked_slot` de `users.json` se recalculan solos en cada lectura, así que no pueden quedar desincronizados.
+- **Edita `time_slots.json` para cambiar la agenda.** La interfaz (selector de días, etiquetas de la semana, número de bloques) se deriva de los horarios guardados: si añades un día o un bloque nuevo, aparece solo.
+- **Añade usuarios a `users.json`** para crear cuentas nuevas (id, nombre, correo, contraseña, avatar y `role`: `admin` o `user`).
+- **Si borras un archivo**, se vuelve a crear con los datos iniciales de la demo en el siguiente arranque.
+- **Si un archivo se corrompe**, se aparta con el sufijo `.invalid-<fecha>` (para poder inspeccionarlo) y se regenera.
+- Las escrituras son **atómicas** (archivo temporal + `rename`) y están **serializadas** con un cerrojo, de modo que dos peticiones simultáneas no se pisan.
+- Las reservas usan **bloqueo optimista** (`version`): si otra persona se adelantó, el servidor responde `409` y la interfaz avisa.
+
+### Herramientas de línea de comandos
+
+```bash
+npm run data:info    # resumen de los datos guardados (usuarios, horarios, avisos)
+npm run data:reset   # libera todas las reservas y borra las notificaciones
+```
+
+### Dónde se guardan los archivos
+
+Por defecto, en `<raíz del proyecto>/data`. Se puede cambiar con la variable de entorno `DATA_DIR`:
+
+```bash
+DATA_DIR=/var/lib/sistema-reservas npm start
+```
+
+Si la ruta configurada no existe o no se puede escribir, la app avisa en la consola y usa `<raíz del proyecto>/data` para no quedarse sin servicio.
+
+---
+
+## API REST
+
+Toda la comunicación con los archivos pasa por un único endpoint. Es la forma más fácil de integrar la app con otros sistemas (scripts, bots, otros paneles…).
+
+### `GET /api/state`
+
+Devuelve el estado completo.
+
+```bash
+curl http://localhost:3000/api/state
+```
+
+```json
+{
+  "ok": true,
+  "state": {
+    "users": [ ... ],
+    "timeSlots": [ ... ],
+    "notifications": [ ... ],
+    "updatedAt": 1762627200000,
+    "revision": 7
+  }
+}
+```
+
+### `POST /api/state`
+
+Aplica una acción y devuelve el estado ya actualizado (no hace falta una segunda llamada).
+
+```json
+{ "action": "book", "payload": { "slotId": "slot-001", "version": 1 }, "userId": "user-002" }
+```
+
+| Acción           | `payload`                    | Qué hace                                        |
+| ---------------- | ---------------------------- | ----------------------------------------------- |
+| `login`          | `{ email, password }`        | Comprueba las credenciales contra `users.json` |
+| `book`           | `{ slotId, version? }`       | Reserva un horario                              |
+| `cancel`         | `{ slotId }`                 | Cancela (o el admin libera) una reserva         |
+| `mark-read`      | `{ notificationId }`         | Marca una notificación como leída               |
+| `mark-all-read`  | `{}`                         | Marca todas como leídas                         |
+| `reset`          | `{}`                         | Reinicia la demo (solo admin)                   |
+
+Ejemplos:
+
+```bash
+# Reservar el slot-001 como María
+curl -X POST http://localhost:3000/api/state \
+  -H "Content-Type: application/json" \
+  -d '{"action":"book","payload":{"slotId":"slot-001","version":1},"userId":"user-002"}'
+
+# Ver el estado
+curl http://localhost:3000/api/state
+```
+
+Códigos de respuesta:
+
+| Código | Significado                                                  |
+| ------ | ------------------------------------------------------------ |
+| `200`  | Todo correcto                                                 |
+| `400`  | Acción desconocida o payload inválido                        |
+| `401`  | Credenciales incorrectas                                      |
+| `403`  | Sin permisos (por ejemplo, cancelar la reserva de otro)      |
+| `404`  | El horario o la notificación no existen                      |
+| `409`  | Conflicto: el horario ya está reservado o cambió            |
 
 ---
 
@@ -75,15 +209,15 @@ Para desarrollo local, copia `.env.example` como `.env.local` y rellena los mism
 - Periodo de reservas de lunes a viernes con 10 bloques de 30 minutos por día (50 horarios).
 - Selector de día con contador de horarios libres por jornada.
 - Reserva con modal de confirmación y validación de horarios ya ocupados.
-- Reprogramación: al reservar otro horario se libera automáticamente el anterior.
+- Varias reservas activas por usuario (hasta 10).
 - Cancelación de reserva con confirmación.
 - Notificaciones para usuarios sin reserva cuando se libera un bloque.
 - Reserva rápida directamente desde la notificación.
 - Contador de no leídas, marcar una o todas como leídas.
 - Panel de administrador: Abel ve el resumen **Horarios seleccionados** con todas las reservas del periodo (usuario, día y hora), puede liberar cualquiera y se notifica al afectado.
-- Reinicio de la demo restringido al administrador (también sincronizado).
+- Reinicio de la demo restringido al administrador.
 - Cambio rápido de usuario para probar la demo completa.
-- Indicador de estado de sincronización: *Modo local / Sincronizando… / Sincronizado / Error*.
+- Indicador de estado: *Conectando… / Guardado en JSON / Sin conexión con el servidor*.
 - Toasts de éxito y error.
 - Diseño responsive: 2 columnas de horarios en móvil, 3 en tablet, 4–5 en laptop/escritorio.
 - Modales tipo *bottom sheet* en móvil y centrados en escritorio.
@@ -94,10 +228,10 @@ Para desarrollo local, copia `.env.example` como `.env.local` y rellena los mism
 
 ## Stack
 
-- [Next.js 16](https://nextjs.org) (App Router, build con Turbopack)
+- [Next.js 16](https://nextjs.org) (App Router, build con Turbopack, Cache Components)
 - [React 19](https://react.dev)
-- [Zustand 5](https://zustand.docs.pmnd.rs) con middleware `persist` (caché local)
-- [Supabase](https://supabase.com) (Postgres + Realtime) para sincronización compartida
+- [Zustand 5](https://zustand.docs.pmnd.rs) con middleware `persist` (caché local en el navegador)
+- `node:fs/promises` para leer y escribir los archivos JSON del servidor
 - [Tailwind CSS 4](https://tailwindcss.com) vía `@tailwindcss/postcss`
 - `next/font` (Inter)
 - ESLint 9 + `eslint-config-next`
@@ -108,7 +242,8 @@ Para desarrollo local, copia `.env.example` como `.env.local` y rellena los mism
 
 - Node.js 20 o superior
 - npm 10 o superior
-- (Opcional pero recomendado) cuenta gratuita de Supabase para sincronización
+
+No hace falta ninguna base de datos, cuenta en la nube ni clave de API.
 
 ---
 
@@ -119,85 +254,75 @@ npm install
 npm run dev
 ```
 
-Abre <http://localhost:3000>.
-
-Para probar la sincronización en local, copia `.env.example` a `.env.local` y completa tu URL y anon key de Supabase.
+Abre <http://localhost:3000>. En el primer arranque se crea la carpeta `data/` con los archivos de la demo.
 
 ### Scripts
 
-| Comando         | Descripción                                  |
-| --------------- | -------------------------------------------- |
-| `npm run dev`   | Servidor de desarrollo con recarga en caliente |
-| `npm run build` | Build de producción                          |
-| `npm start`     | Sirve el build de producción                 |
-| `npm run lint`  | Ejecuta ESLint                               |
-
-Para verificar el build de producción:
-
-```bash
-npm run build
-npm start
-```
+| Comando             | Descripción                                         |
+| ------------------- | --------------------------------------------------- |
+| `npm run dev`       | Servidor de desarrollo con recarga en caliente      |
+| `npm run build`     | Build de producción                                 |
+| `npm start`         | Sirve el build de producción                        |
+| `npm run lint`      | Ejecuta ESLint                                      |
+| `npm run data:info` | Resumen de los datos guardados                      |
+| `npm run data:reset`| Libera reservas y borra notificaciones              |
 
 ---
 
-## Despliegue en Vercel
+## Despliegue
 
 ### Opción A: desde el panel de Vercel
 
 1. Sube el proyecto a GitHub/GitLab/Bitbucket.
-2. En Vercel, pulsa **Add New → Project** e importa el repositorio.
-3. Vercel detecta Next.js automáticamente:
-   - **Framework Preset:** Next.js
-   - **Build Command:** `npm run build`
-   - **Output Directory:** `.next` (por defecto)
-   - **Install Command:** `npm install`
-4. Agrega las dos variables de entorno de Supabase (ver arriba) **antes o después** del primer deploy. Si las agregas después, haz **Redeploy**.
-5. Pulsa **Deploy**.
+2. Vercel → **Add New → Project** e importa el repositorio.
+3. Vercel detecta Next.js automáticamente (**Build Command:** `npm run build`).
+4. **Deploy**.
 
-> El repositorio ya tiene la raíz del proyecto en la carpeta actual (donde está `package.json`), así que no necesitas configurar *Root Directory*.
+> ⚠️ **Vercel es *stateless***: el sistema de archivos del proyecto es de solo lectura y efímero, así que los archivos JSON **no se conservan** entre invocaciones (y durante el despliegue se sobrescriben).
+>
+> Para que el sistema funcione de verdad en Vercel hay que montar un volumen: usa **Vercel Blob** (con `@vercel/blob`) o un servicio tipo **Upstash Redis / Turso** detrás de la misma API, o despliega en un servidor con disco (Docker, VPS, Azure App Service…).
 
-### Opción B: desde la CLI
+### Opción B: servidor con disco (recomendado)
+
+Cualquier hosting con sistema de archivos writable funciona tal cual:
 
 ```bash
-npm i -g vercel
-vercel
-vercel --prod
+npm ci
+npm run build
+DATA_DIR=/var/lib/sistema-reservas npm start
 ```
 
-Después agrega las variables de Supabase en el panel de Vercel y redeploy.
+- **Docker**: monta un volumen, p. ej. `-v reservas:/app/data`.
+- **Azure App Service**: apunta `DATA_DIR` a `/home/data` (Linux) o `C:\home\data` (Windows); la carpeta `/home` sobrevive a los despliegues.
+- **VPS / servidor propio**: apunta `DATA_DIR` a la ruta que quieras.
+
+El repositorio ya trae el flujo de GitHub Actions que compila y publica en Azure Web App (`.github/workflows/`).
 
 ---
 
 ## Personalización
 
-Casi todos los datos del prototipo están en `lib/data.js`:
+| Qué cambiar                | Dónde                                                   |
+| -------------------------- | ------------------------------------------------------- |
+| Datos en caliente          | `data/*.json` (se editan y se aplican al reiniciar)      |
+| Periodo de reservas        | `WEEK_START_ISO` en `lib/data.js` (semilla inicial)     |
+| Cantidad de días hábiles   | `WEEK_DAYS` en `lib/data.js`                            |
+| Bloques de horario         | `TIME_BLOCKS` en `lib/data.js`                          |
+| Usuarios de demostración   | `DEMO_USERS` en `lib/data.js` (semilla) / `data/users.json` (vivo) |
+| Roles (admin / user)       | `role` de cada usuario en `data/users.json`             |
+| Contraseña de la demo      | `password` de cada usuario en `data/users.json`         |
 
-| Qué cambiar                | Dónde                                                      |
-| -------------------------- | ---------------------------------------------------------- |
-| Periodo de reservas        | `WEEK_START_ISO` (lunes en formato `YYYY-MM-DD`)            |
-| Cantidad de días hábiles   | `WEEK_DAYS`                                                 |
-| Bloques de horario         | `TIME_BLOCKS`                                               |
-| Usuarios de demostración   | `DEMO_USERS`                                                |
-| Roles (admin / user)       | `role` de cada usuario en `DEMO_USERS`                      |
-| Contraseña de la demo      | `DEMO_PASSWORD` (también en cada usuario)                   |
+La lógica de reservas, cancelaciones y notificaciones está en `lib/booking.js` (pura, la usan el servidor y el cliente). El acceso a los archivos está en `lib/json-store.js` y la API en `app/api/state/route.js`.
 
-La lógica de reservas, cancelaciones y notificaciones está en `lib/store.js`. La conexión a la nube está en `lib/supabase.js`.
-
-> **Importante:** el periodo usa una fecha fija a propósito. Si se usara la fecha real del servidor y la del navegador podrían no coincidir y romper la hidratación de React. Para actualizar el periodo, cambia `WEEK_START_ISO` y vuelve a desplegar.
+> **Importante:** el periodo usa una fecha fija a propósito. Si se usara la fecha real del servidor y la del navegador podrían no coincidir y romper la hidratación de React. Para actualizar el periodo, cambia `WEEK_START_ISO` y vuelve a desplegar (o edita las fechas en `data/time_slots.json`).
 
 ---
 
 ## Cómo se guarda la información
 
-- **Caché local** (por navegador): clave `sistema-reservas:v1` en `localStorage` (sesión, usuarios, horarios, notificaciones).
-- **Nube compartida** (si Supabase está configurado): tabla `public.app_state`, fila `id=1`, con `payload` (mismos datos menos la sesión actual) y `updated_at`.
-
-Consecuencias:
-
-- Con Supabase configurado, **todos los dispositivos comparten las mismas reservas y notificaciones** (posible pagar con Realtime o polling de 3 s).
-- Sin Supabase, los datos son **por navegador y por dispositivo**; no se comparten. Al limpiar los datos del sitio o usar modo privado, la demo vuelve a su estado inicial.
-- Si cambias la estructura de `lib/data.js`, usa **Reiniciar demo** como administrador (o borra el `localStorage` y la fila remota) para evitar estados viejos.
+- **Archivos JSON (servidor):** `data/users.json`, `data/time_slots.json`, `data/notifications.json` y `data/meta.json`. Son la fuente de verdad y se comparten entre todos los dispositivos.
+- **Caché local (por navegador):** clave `sistema-reservas:v1` en `localStorage` (sesión, usuarios, horarios, notificaciones). Solo sirve para pintar rápido al abrir; se reemplaza por el estado real del servidor en cuanto responde.
+- **Sesión:** quién eres y en qué cuenta estás es local del navegador (como en la demo anterior). Lo que se comparte son las reservas, los usuarios y las notificaciones.
 
 En el servidor el store no toca `localStorage`; la hidratación se hace en cliente detrás de un pequeño *boot screen* (`components/StoreHydration.js`) para evitar diferencias entre el HTML del servidor y el del navegador.
 
@@ -208,25 +333,34 @@ En el servidor el store no toca `localStorage`; la hidratación se hace en clien
 ```
 app/
 ├─ app/
-│  ├─ error.js            # Pantalla de error
-│  ├─ globals.css         # Tema, utilidades y estilos base
-│  ├─ layout.js           # Layout raíz, fuente Inter y metadata
-│  ├─ not-found.js        # 404
-│  └─ page.js             # Página principal
+│  ├─ api/state/route.js  # API REST: lee y escribe los archivos JSON
+│  ├─ error.js             # Pantalla de error
+│  ├─ globals.css          # Tema, utilidades y estilos base
+│  ├─ layout.js            # Layout raíz, fuente Inter y metadata
+│  ├─ not-found.js         # 404
+│  └─ page.js              # Página principal
 ├─ components/
-│  ├─ Dashboard.js        # Layout autenticado + aviso de modo local
-│  ├─ Header.js           # Barra superior, menú de usuario y estado de sincronización
-│  ├─ LoginForm.js        # Inicio de sesión y cuentas demo
-│  ├─ NotificationPanel.js# Panel de notificaciones
-│  ├─ ScheduleGrid.js     # Días, horarios y modales de reserva/cancelación
-│  ├─ StoreHydration.js   # Espera a la caché local + primera sincronización en la nube
-│  └─ ToastContainer.js   # Avisos flotantes
+│  ├─ Dashboard.js         # Layout autenticado + aviso de conexión
+│  ├─ Header.js            # Barra superior, menú de usuario y estado de los archivos
+│  ├─ LoginForm.js         # Inicio de sesión y cuentas (leídas de data/users.json)
+│  ├─ NotificationPanel.js # Panel de notificaciones
+│  ├─ ScheduleGrid.js      # Días, horarios y modales de reserva/cancelación
+│  ├─ StoreHydration.js    # Caché local + primera lectura del servidor + sondeo
+│  └─ ToastContainer.js    # Avisos flotantes
+├─ data/                   # Archivos JSON del sistema (la "base de datos")
+│  ├─ users.json
+│  ├─ time_slots.json
+│  ├─ notifications.json
+│  └─ meta.json
 ├─ lib/
-│  ├─ data.js             # Usuarios demo, periodo y bloques horarios
-│  ├─ store.js            # Estado global, reservas, notificaciones y sync con Supabase
-│  └─ supabase.js         # Cliente de Supabase (solo si hay variables configuradas)
-├─ supabase/
-│  └─ schema.sql          # Script SQL para crear la tabla compartida en Supabase
+│  ├─ api-client.js        # Cliente HTTP de /api/state
+│  ├─ booking.js           # Lógica de negocio (reservas, avisos, reinicio)
+│  ├─ data.js              # Semilla inicial: periodo, bloques y cuentas demo
+│  ├─ json-store.js        # Lectura/escritura atómica de los archivos JSON
+│  ├─ schedule.js          # Etiquetas de la agenda derivadas de los horarios
+│  └─ store.js             # Estado global (Zustand) y sincronización con la API
+├─ scripts/
+│  └─ reset-data.mjs       # Utilidad de línea de comandos para los archivos
 ├─ .env.example            # Modelo de variables de entorno
 ├─ next.config.mjs
 ├─ postcss.config.mjs
@@ -237,6 +371,6 @@ app/
 
 ## Notas
 
-- Es un prototipo de demostración: las contraseñas están en el código del cliente y no hay autenticación real.
-- Las políticas de Supabase de este repo están abiertas para la demo (anon puede leer/escribir `app_state`). Para un sistema real, restringe las políticas y agrega autenticación de Supabase.
-- Al subir un cambio gigante de datos (por ejemplo, reiniciar la demo), el sistema lo propaga a todos los dispositivos en segundos.
+- Es un prototipo de demostración: las contraseñas están en texto plano en `data/users.json` y no hay autenticación real. Para producción, al menos sirve las contraseñas (hash) y añade una capa de sesión en el servidor.
+- Los archivos JSON se versionan con Git: es cómodo para ver los cambios, pero con muchos usuarios reales conviene un motor de base de datos (la API `app/api/state/route.js` es la costura donde cambiarlo).
+- Al subir un cambio grande de datos (por ejemplo, reiniciar la demo), el sistema lo propaga a todos los dispositivos en segundos.

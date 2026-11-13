@@ -11,16 +11,19 @@ export default function LoginForm() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const login = useStore((state) => state.login);
+  const users = useStore((state) => state.users);
+
+  // Las cuentas vienen de `data/users.json` (si el servidor no responde,
+  // se muestran las de ejemplo del código).
+  const demoUsers = users.length > 0 ? users : DEMO_USERS;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Pequeña espera para que el feedback de carga sea visible.
-    await new Promise((resolve) => setTimeout(resolve, 450));
+    const result = await login(email, password);
 
-    const result = login(email, password);
     if (!result.success) {
       setError(result.error);
       setIsLoading(false);
@@ -184,13 +187,13 @@ export default function LoginForm() {
             </div>
 
             <div className="grid grid-cols-1 gap-1 max-h-52 overflow-y-auto">
-              {DEMO_USERS.map((demo) => (
+              {demoUsers.map((demo) => (
                 <button
                   key={demo.id}
                   type="button"
                   onClick={() => {
                     setEmail(demo.email);
-                    setPassword(DEMO_PASSWORD);
+                    setPassword(demo.password || DEMO_PASSWORD);
                     setError('');
                   }}
                   className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-surface-200/60 hover:text-surface-200 hover:bg-primary-500/10 transition-colors group text-left"
@@ -214,15 +217,18 @@ export default function LoginForm() {
             </div>
 
             <p className="text-xs text-center text-surface-200/30 mt-2.5">
-              Contraseña para todas: <code className="text-primary-400/70">{DEMO_PASSWORD}</code>
+              Contraseña de la demo:{' '}
+              <code className="text-primary-400/70">{DEMO_PASSWORD}</code>
             </p>
             <p className="text-[0.65rem] text-center text-surface-200/25 mt-1">
-              Abel García entra como administrador; el resto son usuarios.
+              Las cuentas se leen de <code>data/users.json</code>. Abel García entra como
+              administrador; el resto son usuarios.
             </p>
           </div>
 
           <p className="text-[0.7rem] text-center text-surface-200/25 mt-3 leading-relaxed">
-            Prototipo sin servidor: las reservas se guardan solo en este navegador.
+            Los datos se guardan en archivos JSON del servidor (<code>data/</code>), así que todos
+            los dispositivos ven las mismas reservas.
           </p>
         </div>
       </div>

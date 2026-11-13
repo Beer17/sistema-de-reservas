@@ -77,10 +77,10 @@ export default function NotificationPanel() {
     };
   }, [isOpen]);
 
-  const handleQuickBook = (notification) => {
-    const result = bookSlot(notification.slot_id);
+  const handleQuickBook = async (notification) => {
+    const result = await bookSlot(notification.slot_id);
     if (result.success) {
-      markAsRead(notification.id);
+      await markAsRead(notification.id);
       setIsOpen(false);
     } else {
       addToast({

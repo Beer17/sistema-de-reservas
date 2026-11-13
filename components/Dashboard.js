@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import useStore from '@/lib/store';
 
 import Header from '@/components/Header';
@@ -7,13 +8,17 @@ import LoginForm from '@/components/LoginForm';
 import ScheduleGrid from '@/components/ScheduleGrid';
 import ToastContainer from '@/components/ToastContainer';
 import AdminReservations from '@/components/AdminReservations';
-import { DAY_NAMES, MAX_BOOKINGS_PER_USER, WEEK_LABEL, WEEK_SHORT } from '@/lib/data';
+import { MAX_BOOKINGS_PER_USER } from '@/lib/data';
+import { buildScheduleMeta } from '@/lib/schedule';
 
 export default function Dashboard() {
   const isAuthenticated = useStore((state) => state.isAuthenticated);
   const currentUser = useStore((state) => state.currentUser);
   const timeSlots = useStore((state) => state.timeSlots);
-  const cloudStatus = useStore((state) => state.cloudStatus);
+  const syncStatus = useStore((state) => state.syncStatus);
+
+  const schedule = useMemo(() => buildScheduleMeta(timeSlots), [timeSlots]);
+  const { dayNames, weekLabel, weekShort } = schedule;
 
   if (!isAuthenticated || !currentUser) {
     return <LoginForm />;
@@ -53,26 +58,26 @@ export default function Dashboard() {
       <Header />
 
       <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8">
-        {cloudStatus === 'local' && (
-          <div className="mb-4 rounded-xl border border-warning-500/30 bg-warning-500/10 px-4 py-3 text-xs sm:text-sm text-warning-400">
-            <p className="font-semibold mb-0.5">Modo local: no se ve entre dispositivos</p>
-            <p className="text-warning-400/80">
-              Configura <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code> y{' '}
-              <code className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> en Vercel para que la reserva de Juanito se vea en tu perfil de Abel.
-              Ver <code className="font-mono">.env.example</code> y <code className="font-mono">supabase/schema.sql</code>.
+        {syncStatus === 'error' && (
+          <div className="mb-4 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-xs sm:text-sm text-danger-400">
+            <p className="font-semibold mb-0.5">Sin conexión con el servidor de archivos</p>
+            <p className="text-danger-400/80">
+              No se pudo leer <code className="font-mono">data/</code>. Se muestran los datos en
+              caché de este navegador y no se pueden guardar reservas nuevas. Comprueba que el
+              servidor esté en marcha y que la carpeta de datos sea escribible.
             </p>
           </div>
         )}
-        {cloudStatus === 'error' && (
-          <div className="mb-4 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-xs sm:text-sm text-danger-400">
-            No se pudo sincronizar con la nube. Revisa las variables de Supabase y reintenta.
+        {syncStatus === 'connecting' && (
+          <div className="mb-4 rounded-xl border border-warning-500/30 bg-warning-500/10 px-4 py-3 text-xs sm:text-sm text-warning-400">
+            Conectando con el servidor de archivos JSON…
           </div>
         )}
         <div className="glass-card rounded-2xl p-4 sm:p-6">
           {/* Saludo */}
           <div className="mb-6 sm:mb-8 animate-fade-in-up">
             <p className="text-[0.7rem] sm:text-xs uppercase tracking-wider text-primary-400/80 font-semibold mb-1">
-              {WEEK_LABEL}
+              {weekLabel}
             </p>
             <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2 leading-tight">
               Hola,{' '}
@@ -92,7 +97,7 @@ export default function Dashboard() {
                 <>
                   Tu reserva está confirmada para el{' '}
                   <span className="text-white font-medium">
-                    {DAY_NAMES[mySlot.date] || mySlot.date}
+                    {dayNames[mySlot.date] || mySlot.date}
                   </span>{' '}
                   de {mySlot.start_time} a {mySlot.end_time}.
                 </>
@@ -100,7 +105,7 @@ export default function Dashboard() {
                 <>
                   Tienes{' '}
                   <span className="text-white font-medium">{mySlots.length} reservas confirmadas</span>.
-                  Próxima: {DAY_NAMES[mySlot.date] || mySlot.date} de {mySlot.start_time} a{' '}
+                  Próxima: {dayNames[mySlot.date] || mySlot.date} de {mySlot.start_time} a{' '}
                   {mySlot.end_time}.
                 </>
               )}
@@ -126,7 +131,7 @@ export default function Dashboard() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[0.65rem] sm:text-xs text-surface-200/40 uppercase tracking-wider">Periodo</p>
-                  <p className="text-xs sm:text-sm font-semibold text-white truncate">{WEEK_SHORT}</p>
+                  <p className="text-xs sm:text-sm font-semibold text-white truncate">{weekShort}</p>
                 </div>
               </div>
             </div>

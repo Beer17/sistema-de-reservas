@@ -1,0 +1,57 @@
+[
+  {
+    "id": "user-001",
+    "name": "Abel García",
+    "email": "abel@empresa.com",
+    "password": "1234",
+    "avatar": "AG",
+    "role": "admin",
+    "has_booked_slot": false,
+    "booked_slot_id": null,
+    "booked_slot_ids": []
+  },
+  {
+    "id": "user-002",
+    "name": "María López",
+    "email": "maria@empresa.com",
+    "password": "1234",
+    "avatar": "ML",
+    "role": "user",
+    "has_booked_slot": false,
+    "booked_slot_id": null,
+    "booked_slot_ids": []
+  },
+  {
+    "id": "user-003",
+    "name": "Carlos Ruiz",
+    "email": "carlos@empresa.com",
+    "password": "1234",
+    "avatar": "CR",
+    "role": "user",
+    "has_booked_slot": false,
+    "booked_slot_id": null,
+    "booked_slot_ids": []
+  },
+  {
+    "id": "user-004",
+    "name": "Ana Torres",
+    "email": "ana@empresa.com",
+    "password": "1234",
+    "avatar": "AT",
+    "role": "user",
+    "has_booked_slot": false,
+    "booked_slot_id": null,
+    "booked_slot_ids": []
+  },
+  {
+    "id": "user-005",
+    "name": "Luis Mendoza",
+    "email": "luis@empresa.com",
+    "password": "1234",
+    "avatar": "LM",
+    "role": "user",
+    "has_booked_slot": false,
+    "booked_slot_id": null,
+    "booked_slot_ids": []
+  }
+]

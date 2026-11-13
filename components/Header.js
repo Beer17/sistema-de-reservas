@@ -11,26 +11,26 @@ export default function Header() {
   const resetDemo = useStore((state) => state.resetDemo);
   const logout = useStore((state) => state.logout);
   const addToast = useStore((state) => state.addToast);
-  const cloudStatus = useStore((state) => state.cloudStatus);
+  const syncStatus = useStore((state) => state.syncStatus);
   const lastSyncedAt = useStore((state) => state.lastSyncedAt);
 
   const isAdmin = currentUser?.role === 'admin';
 
   const syncLabel =
-    cloudStatus === 'synced'
-      ? 'Sincronizado'
-      : cloudStatus === 'syncing'
-        ? 'Sincronizando…'
-        : cloudStatus === 'error'
-          ? 'Error de sincronización'
-          : 'Modo local';
+    syncStatus === 'synced'
+      ? 'Guardado en JSON'
+      : syncStatus === 'connecting'
+        ? 'Conectando…'
+        : syncStatus === 'error'
+          ? 'Sin conexión con el servidor'
+          : 'Conectando…';
 
   const syncDot =
-    cloudStatus === 'synced'
+    syncStatus === 'synced'
       ? 'bg-accent-500'
-      : cloudStatus === 'syncing'
+      : syncStatus === 'connecting'
         ? 'bg-warning-400 animate-pulse'
-        : cloudStatus === 'error'
+        : syncStatus === 'error'
           ? 'bg-danger-400'
           : 'bg-surface-200/30';
 
@@ -65,19 +65,19 @@ export default function Header() {
 
   const handleReset = () => {
     const confirmed = window.confirm(
-      '¿Reiniciar la demo? Se borrarán las reservas y las notificaciones de este navegador.'
+      '¿Reiniciar la demo? Se borrarán las reservas y las notificaciones guardadas en los archivos JSON.'
     );
     if (confirmed) {
-      const result = resetDemo();
       setMenuOpen(false);
-
-      if (!result.success) {
-        addToast({
-          type: 'error',
-          title: 'Acción no permitida',
-          message: result.error || 'Solo un administrador puede reiniciar la demo.',
-        });
-      }
+      resetDemo().then((result) => {
+        if (!result.success) {
+          addToast({
+            type: 'error',
+            title: 'Acción no permitida',
+            message: result.error || 'Solo un administrador puede reiniciar la demo.',
+          });
+        }
+      });
     }
   };
 
